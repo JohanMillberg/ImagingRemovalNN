@@ -7,7 +7,7 @@ from tensorflow.keras.datasets import fashion_mnist
 from scipy.signal import convolve2d as conv2
 
 import os
-os.environ['TF_CPP_MIN_LOG_LEBEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 # model
@@ -33,6 +33,21 @@ class ArtifactRemover(keras.Model):
         return decoded
 
 
+class ArtifactRemoverV2(keras.Model):
+    def __init__(self):
+        super().__init__()
+
+        self.model = keras.models.Sequential([
+            layers.Input(shape=(28, 28, 1)),
+            layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
+            layers.Conv2D(4, (3, 3), activation='relu', padding='same'),
+            layers.Conv2D(1, (2, 2), activation='relu', padding='same')
+        ])
+        print(self.model.summary())
+
+    def call(self, x):
+        return self.model(x)
+
 
 def preprocess_data(train_images: np.array, test_images: np.array):
     train_normalized = train_images / 255.0
@@ -41,7 +56,7 @@ def preprocess_data(train_images: np.array, test_images: np.array):
 
 def convolve_images(images):
     convolved = images.copy()
-    psf = np.ones((2,2)) / 25
+    psf = 1 / 15 * np.array([[1, 2, 1], [2, 3, 2], [1, 2, 1]])
     n_images = convolved.shape[0]
 
     for i in range(n_images):
@@ -58,7 +73,6 @@ x_train, x_test = preprocess_data(x_train, x_test)
 x_train_convolved = convolve_images(x_train)
 x_test_convolved = convolve_images(x_test)
 
-"""
 artifact_remover = ArtifactRemover()
 # loss and optimizer
 loss = keras.losses.MeanSquaredError()
@@ -70,18 +84,13 @@ artifact_remover.fit(x_train_convolved,
           x_train,
           epochs=10,
           shuffle=True,
-          batch_size=10,
+          batch_size=50,
           verbose=2,
           validation_data=(x_test_convolved, x_test))
 
 encoded_images = artifact_remover.encoder(x_test_convolved).numpy()
 decoded_images = artifact_remover.decoder(encoded_images)
-"""
-model = keras.models.Sequential([
-    layers.Input(shape=(28, 28, 1)),
-    layers.Conv2D(18, (4, 4), activation='relu', padding='same'),
-
-])
+# decoded_images = artifact_remover(x_test_convolved)
 
 n = 3 
 plt.figure(figsize=(20, 7))
