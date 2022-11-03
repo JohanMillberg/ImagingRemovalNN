@@ -67,6 +67,37 @@ def convolve_images(images):
     return convolved
 
 
+def plot_comparison(n_images, convolved_images, reconstructed_images):
+ 
+    n = 3 
+    plt.figure(figsize=(20, 7))
+    plt.gray()
+
+    for i in range(n): 
+        # display convoluted originals 
+        bx = plt.subplot(3, n, i + 1) 
+        plt.title("convoluted originals") 
+        plt.imshow(tf.squeeze(convolved_images[i])) 
+        bx.get_xaxis().set_visible(False) 
+        bx.get_yaxis().set_visible(False) 
+        
+        # display reconstruction 
+        cx = plt.subplot(3, n, i + n + 1) 
+        plt.title("reconstructed") 
+        plt.imshow(tf.squeeze(reconstructed_images[i])) 
+        cx.get_xaxis().set_visible(False) 
+        cx.get_yaxis().set_visible(False) 
+        
+        # display original 
+        ax = plt.subplot(3, n, i + 2*n + 1) 
+        plt.title("original") 
+        plt.imshow(tf.squeeze(x_test[i])) 
+        ax.get_xaxis().set_visible(False) 
+        ax.get_yaxis().set_visible(False) 
+
+    plt.show()
+
+
 (x_train, _), (x_test, _) = fashion_mnist.load_data()
 x_train, x_test = preprocess_data(x_train, x_test)
 
@@ -82,39 +113,12 @@ metrics = ["accuracy"]
 artifact_remover.compile(metrics=metrics, loss=loss, optimizer=optim)
 artifact_remover.fit(x_train_convolved,
           x_train,
-          epochs=10,
+          epochs=20,
           shuffle=True,
-          batch_size=50,
+          batch_size=100,
           verbose=2,
           validation_data=(x_test_convolved, x_test))
 
-encoded_images = artifact_remover.encoder(x_test_convolved).numpy()
-decoded_images = artifact_remover.decoder(encoded_images)
-# decoded_images = artifact_remover(x_test_convolved)
+decoded_images = artifact_remover(x_test_convolved)
 
-n = 3 
-plt.figure(figsize=(20, 7))
-plt.gray()
-for i in range(n): 
-  # display convoluted originals 
-  bx = plt.subplot(3, n, i + 1) 
-  plt.title("convoluted originals") 
-  plt.imshow(tf.squeeze(x_test_convolved[i])) 
-  bx.get_xaxis().set_visible(False) 
-  bx.get_yaxis().set_visible(False) 
-  
-  # display reconstruction 
-  cx = plt.subplot(3, n, i + n + 1) 
-  plt.title("reconstructed") 
-  plt.imshow(tf.squeeze(decoded_images[i])) 
-  cx.get_xaxis().set_visible(False) 
-  cx.get_yaxis().set_visible(False) 
-  
-  # display original 
-  ax = plt.subplot(3, n, i + 2*n + 1) 
-  plt.title("original") 
-  plt.imshow(tf.squeeze(x_test[i])) 
-  ax.get_xaxis().set_visible(False) 
-  ax.get_yaxis().set_visible(False) 
-
-plt.show()
+plot_comparison(3, x_test_convolved, decoded_images)
