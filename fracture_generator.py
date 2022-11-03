@@ -46,7 +46,8 @@ class FractureGenerator:
                 x_exact = xs
                 y_exact = ys
 
-                for _ in range(fracture_length-1):
+                fractured_pixels = 1
+                while fractured_pixels < fracture_length:
                     x_exact = x_exact + np.cos(fracture_angle)
                     y_exact = y_exact + np.sin(fracture_angle)
 
@@ -57,7 +58,9 @@ class FractureGenerator:
                         n_iterations += 1
                         break
 
-                    pixels_to_fracture.append((x_index, y_index))
+                    if (x_index, y_index) not in pixels_to_fracture:
+                        pixels_to_fracture.append((x_index, y_index))
+                        fractured_pixels += 1
 
                 fracture_is_valid = True
                 for x, y in pixels_to_fracture:
