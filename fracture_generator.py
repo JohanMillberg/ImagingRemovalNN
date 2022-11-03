@@ -6,8 +6,8 @@ from scipy.stats import truncnorm, norm, uniform
 class FractureGenerator:
 
     def __init__(self,
-                 image_height: int,
                  image_width: int,
+                 image_height: int,
                  n_fractures: int,
                  max_length: float = 160.0,
                  std_dev_length: float = 30.0,
@@ -85,8 +85,6 @@ class FractureGenerator:
 
         return False
 
-        
-
     def _collides_with_fracture(self, image, x, y):
         return image[x, y] > 0
 
@@ -95,7 +93,7 @@ class FractureGenerator:
         plt.imshow(tf.squeeze(image))
         plt.show()
 
-generator = FractureGenerator(1000, 1000, 10, 200, 50)
-result = generator.generate_fractures(tf.zeros((1000, 1000))).numpy()
+generator = FractureGenerator(150, 300, 10, 50, 10)
+result = generator.generate_fractures(tf.zeros((150, 300))).numpy()
 result = result / 3
 generator.plot_image(result)
