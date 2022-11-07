@@ -96,7 +96,35 @@ class FractureGenerator:
         plt.imshow(tf.squeeze(image))
         plt.show()
 
-generator = FractureGenerator(150, 300, 10, 50, 10)
-result = generator.generate_fractures(tf.zeros((150, 300))).numpy()
-result = result / 3
-generator.plot_image(result)
+
+def normalize_image(image: tf.Tensor):
+    normalized = tf.cast(image, dtype=tf.float32)
+    normalized = normalized / tf.reduce_max(tf.abs(normalized))
+
+    return normalized
+
+
+def main():
+    image_height = 150
+    image_width = 300
+    n_fractures = 10
+    max_length = 50
+    std_dev_length = 10
+
+    generator = FractureGenerator(image_height,
+                                  image_width,
+                                  n_fractures,
+                                  max_length,
+                                  std_dev_length)
+
+    result = generator.generate_fractures(tf.zeros(
+                                         (image_height, image_width))
+                                         ).numpy()
+
+    result = normalize_image(result)
+
+    generator.plot_image(result)
+
+
+if __name__ == "__main__":
+    main()

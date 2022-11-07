@@ -50,8 +50,8 @@ class ArtifactRemoverV2(keras.Model):
 
 
 def preprocess_data(train_images: np.array, test_images: np.array):
-    train_normalized = train_images / 255.0
-    test_normalized = test_images / 255.0
+    train_normalized = train_images.astype(float) / np.max(train_images)
+    test_normalized = test_images.astype(float) / np.max(test_images)
     return train_normalized, test_normalized
 
 def convolve_images(images):
@@ -113,7 +113,7 @@ metrics = ["accuracy"]
 artifact_remover.compile(metrics=metrics, loss=loss, optimizer=optim)
 artifact_remover.fit(x_train_convolved,
           x_train,
-          epochs=20,
+          epochs=10,
           shuffle=True,
           batch_size=100,
           verbose=2,
