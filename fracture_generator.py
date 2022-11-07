@@ -97,7 +97,7 @@ class FractureGenerator:
     def _blur_fracture_edges(self, image):
         convolved = image.copy()
 
-        psf = np.array([[1, 2, 1], [2, 3, 2], [1, 2,1 ]], dtype='float64')
+        psf = np.array([[1, 2, 1], [2, 3, 2], [1, 2,1 ]], dtype='float32')
         psf *= 1 / np.sum(psf)
 
         convolved = conv2(convolved, psf, 'same')
