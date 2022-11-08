@@ -4,7 +4,6 @@ import matplotlib.image
 import tensorflow as tf
 from scipy.stats import truncnorm, norm, uniform
 from scipy.signal import convolve2d as conv2
-import cv2
 from PIL import Image
 
 class FractureGenerator:
@@ -160,7 +159,7 @@ class FractureGenerator:
                                        ).astype(np.float32)
 
         gauss_noise = gauss_noise.reshape(*image.shape)
-        noisy_image = cv2.add(image, gauss_noise)
+        noisy_image = np.add(image, gauss_noise)
 
         return noisy_image
         """
