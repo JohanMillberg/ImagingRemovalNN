@@ -5,6 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tensorflow.keras.datasets import fashion_mnist
 from scipy.signal import convolve2d as conv2
+from scipy.stats import truncnorm
+import cv2
 from PIL import Image
 
 import os
@@ -39,7 +41,7 @@ class ArtifactRemoverV2(keras.Model):
         super().__init__()
 
         self.model = keras.models.Sequential([
-            layers.Input(shape=(28, 28, 1)),
+            layers.Input(shape=(150, 300, 1)),
             layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
             layers.Conv2D(4, (3, 3), activation='relu', padding='same'),
             layers.Conv2D(1, (2, 2), activation='relu', padding='same')
@@ -69,7 +71,6 @@ def load_images(image_directory: str,
     test_images = image_tensor[training_index:, :, :]
 
     train_images, test_images = preprocess_data(train_images, test_images)
-
     return train_images, test_images
 
 
@@ -93,6 +94,16 @@ def convolve_images(images):
 
     return convolved
 
+def add_noise(image: np.array, mean_noise: float, std_dev_noise: float):
+    gauss_noise = np.random.normal(loc=mean_noise,
+                                   scale=std_dev_noise,
+                                   size=image.size
+                                   )
+
+    gauss_noise = gauss_noise.reshape(*image.shape)
+    noisy_image = cv2.add(image, gauss_noise)
+
+    return noisy_image
 
 def plot_comparison(n_images, convolved_images, reconstructed_images):
  
@@ -132,12 +143,14 @@ x_train, x_test = load_images("images/fractured", 150, 300, 1000, 0.2)
 x_train, x_test = preprocess_data(x_train, x_test)
 """
 x_train_convolved = convolve_images(x_train)
+x_train_convolved = add_noise(x_train_convolved, 1, 0.1)
 x_test_convolved = convolve_images(x_test)
+x_test_convolved = add_noise(x_test_convolved, 1, 0.1)
 
 x_train = x_train[..., tf.newaxis]
 x_test = x_test[..., tf.newaxis]
 
-artifact_remover = ArtifactRemover()
+artifact_remover = ArtifactRemoverV2()
 # loss and optimizer
 loss = keras.losses.MeanSquaredError()
 optim = keras.optimizers.Adam(learning_rate=0.001)
@@ -146,9 +159,9 @@ metrics = ["accuracy"]
 artifact_remover.compile(metrics=metrics, loss=loss, optimizer=optim)
 artifact_remover.fit(x_train_convolved,
           x_train,
-          epochs=10,
+          epochs=1,
           shuffle=True,
-          batch_size=100,
+          batch_size=5,
           verbose=2,
           validation_data=(x_test_convolved, x_test))
 

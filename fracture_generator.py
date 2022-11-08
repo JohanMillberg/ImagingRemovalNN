@@ -4,6 +4,7 @@ import matplotlib.image
 import tensorflow as tf
 from scipy.stats import truncnorm, norm, uniform
 from scipy.signal import convolve2d as conv2
+import cv2
 from PIL import Image
 
 class FractureGenerator:
@@ -32,7 +33,9 @@ class FractureGenerator:
         self.angle_distribution = norm(loc=0, scale=std_dev_angle)
         self.x_distribution = uniform(loc=0, scale=self.image_width)
         self.y_distribution = uniform(loc=0, scale=self.image_height)
-        self.noise_distribution = truncnorm(0, np.Inf, loc=mean_noise, scale=std_dev_noise)
+
+        self.mean_noise = mean_noise
+        self.std_dev_noise = std_dev_noise
 
         self.max_iterations = max_iterations
 
@@ -151,10 +154,22 @@ class FractureGenerator:
         return image[x, y] == -1
 
     def _add_noise(self, image: np.array, mean_noise: int, std_dev_noise: int):
+        gauss_noise = np.random.normal(loc=self.mean_noise,
+                                       scale=self.std_dev_noise,
+                                       size=image.size
+                                       ).astype(np.float32)
+
+        gauss_noise = gauss_noise.reshape(*image.shape)
+        noisy_image = cv2.add(image, gauss_noise)
+
+        return noisy_image
+        """
         rvs_vec = np.vectorize(self._noise_helper,
-                               excluded=['distribution'],
-                               otypes=['float32'])
+                        excluded=['distribution'],
+                        otypes=['float32'])
+
         return rvs_vec(p=image, distribution=self.noise_distribution)
+        """
 
     def _noise_helper(self, p, distribution):
         return p + distribution.rvs()
@@ -178,7 +193,7 @@ def main():
     image_width = 300
     n_fractures = 10
     fracture_width = 2
-    buffer_size = 20 # space between fractures
+    buffer_size = 10 # space between fractures
     mean_noise = 1.0
     std_dev_noise = 0.2
     max_length = 50
@@ -187,7 +202,7 @@ def main():
     mean_noise = 1.0
     std_dev_noise = 0.2
     max_iterations = 15
-    n_images_to_generate = 1
+    n_images_to_generate = 5
 
     generator = FractureGenerator(image_height,
                                   image_width,
@@ -211,8 +226,8 @@ def main():
 
         # Save the images
         # tf.keras.utils.save_img(
-        #    f"./images/fractured/im{i}.jpg",
-        #    result
+        #     f"./images/fractured/im{i}.jpg",
+        #     result
         # )
 
     generator.plot_image(result)
