@@ -51,6 +51,54 @@ class ArtifactRemoverV2(keras.Model):
         return self.model(x)
 
 
+
+def dual_convolutional_block(x, n_filters):
+    x = layers.Conv2D(n_filters, 6, padding='same', activation='relu')
+    x = layers.Conv2D(n_filters, 6, padding='same', activation='relu')
+
+    return x
+
+def downsample_block(x, n_filters):
+    f = dual_convolutional_block(x, n_filters)
+    p = layers.MaxPool2D(2)(f)
+    p = layers.Dropout(0.2)(p)
+
+    return f, p
+
+def upsample_block(x, conv_features, n_filters):
+    x = layers.Conv2DTranspose(n_filters, 6, 2, padding='same')(x)
+    x = layers.Concatenate([x, conv_features])
+    x = layers.Dropout(0.2)(x)
+    x = dual_convolutional_block(x, n_filters)
+
+    return x
+
+def artifact_remover_unet(x):
+    inputs = layers.Input(shape=(150, 150, 1))
+
+    f1, p1 = downsample_block(inputs, 64) 
+
+    f2, p2 = downsample_block(p1, 128)
+
+    f3, p3 = downsample_block(p2, 256)
+
+    f4, p4 = downsample_block(p3, 512)
+
+    latent = dual_convolutional_block(p4, 1024)
+
+    u6 = upsample_block(latent, f4, 512)
+
+    u7 = upsample_block(u6, f3, 256)
+
+    u8 = upsample_block(u7, f2, 128)
+
+    u9 = upsample_block(u8, f1, 64)
+
+    outputs = layers.Conv2D(1, 1, padding='same', activation='sigmoid')(u9)
+    
+    model = tf.keras.Model(inputs, outputs)
+
+
 def load_images(image_directory: str,
                 image_height: int,
                 image_width: int,
