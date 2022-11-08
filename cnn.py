@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tensorflow.keras.datasets import fashion_mnist
 from scipy.signal import convolve2d as conv2
+from scipy.stats import truncnorm
 from PIL import Image
 
 import os
@@ -18,13 +19,13 @@ class ArtifactRemover(keras.Model):
 
         self.encoder = keras.models.Sequential([
             layers.Input(shape=(150, 300, 1)),
-            layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=1),
-            layers.Conv2D(8, (3, 3), activation='relu', padding='same', strides=1)
+            layers.Conv2D(16, (15, 15), activation='relu', padding='same', strides=3),
+            layers.Conv2D(8, (6, 6), activation='relu', padding='same', strides=2)
         ])
 
         self.decoder = keras.models.Sequential([
-            layers.Conv2DTranspose(8, kernel_size=3, strides=1, activation='relu', padding='same'),
-            layers.Conv2DTranspose(16, kernel_size=3, strides=1, activation='relu', padding='same'),
+            layers.Conv2DTranspose(8, kernel_size=6, strides=2, activation='relu', padding='same'),
+            layers.Conv2DTranspose(16, kernel_size=15, strides=3, activation='relu', padding='same'),
             layers.Conv2D(1, kernel_size=(3, 3), activation='sigmoid', padding='same')
         ])
 
@@ -39,7 +40,7 @@ class ArtifactRemoverV2(keras.Model):
         super().__init__()
 
         self.model = keras.models.Sequential([
-            layers.Input(shape=(28, 28, 1)),
+            layers.Input(shape=(150, 300, 1)),
             layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
             layers.Conv2D(4, (3, 3), activation='relu', padding='same'),
             layers.Conv2D(1, (2, 2), activation='relu', padding='same')
@@ -68,8 +69,6 @@ def load_images(image_directory: str,
     train_images = image_tensor[:training_index, :, :]
     test_images = image_tensor[training_index:, :, :]
 
-    train_images, test_images = preprocess_data(train_images, test_images)
-
     return train_images, test_images
 
 
@@ -93,6 +92,21 @@ def convolve_images(images):
 
     return convolved
 
+def add_noise(images: np.array, mean_noise: float, std_dev_noise: float):
+    
+    noisy_images = images.copy()
+    n_images = noisy_images.shape[0]
+
+    for i in range(n_images):
+        gauss_noise = np.random.normal(loc=mean_noise,
+                                    scale=std_dev_noise,
+                                    size=noisy_images[i].size
+                                    )
+
+        gauss_noise = gauss_noise.reshape(*(noisy_images[i]).shape)
+        noisy_images[i] = np.add(noisy_images[i], gauss_noise)
+
+    return noisy_images
 
 def plot_comparison(n_images, convolved_images, reconstructed_images):
  
@@ -124,33 +138,42 @@ def plot_comparison(n_images, convolved_images, reconstructed_images):
 
     plt.show()
 
+if __name__ == "__main__":
+    x_train, x_test = load_images("images/fractured", 150, 300, 1000, 0.2)
 
-x_train, x_test = load_images("images/fractured", 150, 300, 1000, 0.2)
+    """
+    (x_train, _), (x_test, _) = fashion_mnist.load_data()
+    x_train, x_test = preprocess_data(x_train, x_test)
+    """
+    x_train_convolved = convolve_images(x_train)
+    # x_train_convolved = add_noise(x_train_convolved, 1, 0.1)
+    x_test_convolved = convolve_images(x_test)
+    # x_test_convolved = add_noise(x_test_convolved, 1, 0.1)
+    
+    x_train_convolved, x_test_convolved = preprocess_data(x_train_convolved, x_test_convolved)
 
-"""
-(x_train, _), (x_test, _) = fashion_mnist.load_data()
-x_train, x_test = preprocess_data(x_train, x_test)
-"""
-x_train_convolved = convolve_images(x_train)
-x_test_convolved = convolve_images(x_test)
+    x_train = x_train[..., tf.newaxis]
+    x_test = x_test[..., tf.newaxis]
 
-x_train = x_train[..., tf.newaxis]
-x_test = x_test[..., tf.newaxis]
+    x_train, x_test = preprocess_data(x_train, x_test)
 
-artifact_remover = ArtifactRemover()
-# loss and optimizer
-loss = keras.losses.MeanSquaredError()
-optim = keras.optimizers.Adam(learning_rate=0.001)
-metrics = ["accuracy"]
+    artifact_remover = ArtifactRemover()
+    # loss and optimizer
+    loss = keras.losses.MeanSquaredError()
+    optim = keras.optimizers.Adam(learning_rate=0.001)
+    metrics = ["accuracy"]
 
-artifact_remover.compile(metrics=metrics, loss=loss, optimizer=optim)
-artifact_remover.fit(x_train_convolved,
-          x_train,
-          epochs=10,
-          shuffle=True,
-          batch_size=100,
-          verbose=2,
-          validation_data=(x_test_convolved, x_test))
+    artifact_remover.compile(metrics=metrics, loss=loss, optimizer=optim)
+    artifact_remover.fit(x_train_convolved,
+            x_train,
+            epochs=10,
+            shuffle=False,
+            batch_size=50,
+            verbose=2,
+            validation_data=(x_test_convolved, x_test))
 
-decoded_images = artifact_remover(x_test_convolved)
-plot_comparison(3, x_test_convolved, decoded_images)
+    decoded_images = artifact_remover(x_test_convolved)
+    plt.gray()
+    plt.imshow(tf.squeeze(decoded_images[0]))
+    plt.show()
+    plot_comparison(3, x_test_convolved, decoded_images)
