@@ -91,7 +91,7 @@ class FractureGenerator:
         # Produce the resulting image
         fracture_image[fracture_image == -1] = 0 # Remove the buffer
         fracture_image = self._blur_fracture_edges(fracture_image)
-        fracture_image = self._add_noise(fracture_image, 1, 0.1)
+        # fracture_image = self._add_noise(fracture_image, 1, 0.1)
         fracture_image = tf.convert_to_tensor(fracture_image)
         resulting_image = tf.math.add(image, fracture_image)
 
@@ -201,7 +201,7 @@ def main():
     mean_noise = 1.0
     std_dev_noise = 0.2
     max_iterations = 15
-    n_images_to_generate = 5
+    n_images_to_generate = 2000
 
     generator = FractureGenerator(image_height,
                                   image_width,
@@ -224,10 +224,10 @@ def main():
         result = tf.expand_dims(result, 2)
 
         # Save the images
-        # tf.keras.utils.save_img(
-        #     f"./images/fractured/im{i}.jpg",
-        #     result
-        # )
+        tf.keras.utils.save_img(
+            f"./images/fractured/im{i}.jpg",
+            result
+        )
 
     generator.plot_image(result)
 
