@@ -12,6 +12,8 @@ from PIL import Image
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+# tf.config.run_functions_eagerly(True)
+
 sobel_filter = K.variable([[[[1., 1.]], [[0., 2.]], [[-1., 1.]]],
                             [[[2., 0.]], [[0., 0.]], [[-2., 0.]]],
                             [[[1., -1.]], [[0., -2.]], [[-1., -1.]]]])
@@ -97,13 +99,19 @@ def artifact_remover_unet():
 
     return model
 
-def sobel_loss(target, predicted):
+def mse_sobel_loss(target, predicted):
     sobel_filter = sobel(target)
+    mse = tf.keras.losses.MeanSquaredError()
+    
+    gamma = 1.0 # weight of sobel loss
 
     sobel_target = K.depthwise_conv2d(target, sobel_filter)
     sobel_predicted = K.depthwise_conv2d(predicted, sobel_filter)
- 
-    return K.mean(K.square(sobel_target - sobel_predicted))
+
+    return tf.math.add(
+            tf.math.scalar_mul(gamma, K.mean(K.square(sobel_target - sobel_predicted))),
+            tf.math.scalar_mul((1-gamma), mse(target, predicted))
+    )
 
 def sobel(input):
     input_channels = K.reshape(K.ones_like(input[0, 0, 0, :]), (1, 1, -1, 1))
@@ -220,7 +228,7 @@ if __name__ == "__main__":
     optim = keras.optimizers.Adam(learning_rate=0.001)
     metrics = ["accuracy"]
 
-    artifact_remover.compile(metrics=metrics, loss=sobel_loss, optimizer=optim)
+    artifact_remover.compile(metrics=metrics, loss=mse_sobel_loss, optimizer=optim)
     artifact_remover.fit(x_train_convolved,
             x_train,
             epochs=10,
@@ -230,7 +238,4 @@ if __name__ == "__main__":
             validation_data=(x_test_convolved, x_test))
 
     decoded_images = artifact_remover(x_test_convolved)
-    plt.gray()
-    plt.imshow(tf.squeeze(x_test_convolved[0]))
-    plt.show()
     plot_comparison(3, x_test_convolved, decoded_images)
