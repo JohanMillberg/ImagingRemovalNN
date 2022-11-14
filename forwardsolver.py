@@ -20,10 +20,10 @@ N_t = 70
 class ForwardSolver:
 
     def __init__(self, 
-                N_x: int = 10,
-                N_y: int = 10,
+                N_x: int = 512,
+                N_y: int = 512,
                 N_s: int = 5,
-                delta_x: float = 630,
+                delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
                 N_t: int = 70):
 
@@ -44,11 +44,12 @@ class ForwardSolver:
         I_k = np.eye(self.N)
         D_k = np.diag(np.full(self.N, -2)) + np.diag(np.ones(self.N-1),1) + np.diag(np.ones(self.N-1),-1)
         L = (1/self.delta_x**2)*(np.kron(D_k, I_k) + np.kron(I_k, D_k)) 
-        C = np.diag(self.wavelength) 
+        C = 1000*np.diag(self.wavelength) 
+
         A = - C @ L @ C
 
-        u = self.tau*np.ones((3, self.N_x * self.N_y)) # Stores past, current and future instances
-        print(np.shape(A))
+        u = np.ones((3, self.N_x * self.N_y)) # Stores past, current and future instances
+        
         return u, A      
 
     def forward_solver(self):
@@ -59,11 +60,12 @@ class ForwardSolver:
         u, A = self.init_simulation()
 
         for i in range(1,len(time)-1):
-            u[2] = u[1]
+            u[0] = (-self.delta_t**2 * A) @ u[1] - u[2] + 2*u[1]
+            u[2] = u[1] 
             u[1] = u[0]
-
-            u[0] = (2 - self.delta_t**2 * A) @ u[1] + u[2]
-            print(u[0])
+            
+        plt.plot(u[0])
+        plt.show()
 
 def main():
     
