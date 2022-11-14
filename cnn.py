@@ -14,11 +14,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # tf.config.run_functions_eagerly(True)
 
-sobel_filter = K.variable([[[[1., 1.]], [[0., 2.]], [[-1., 1.]]],
-                            [[[2., 0.]], [[0., 0.]], [[-2., 0.]]],
-                            [[[1., -1.]], [[0., -2.]], [[-1., -1.]]]])
-
-
 # model
 class ArtifactRemover(keras.Model):
     def __init__(self):
@@ -100,22 +95,16 @@ def artifact_remover_unet():
     return model
 
 def mse_sobel_loss(target, predicted):
-    sobel_filter = sobel(target)
+    sobel_target = tf.image.sobel_edges(target)
+    sobel_predicted = tf.image.sobel_edges(predicted)
     mse = tf.keras.losses.MeanSquaredError()
     
     gamma = 1.0 # weight of sobel loss
-
-    sobel_target = K.depthwise_conv2d(target, sobel_filter)
-    sobel_predicted = K.depthwise_conv2d(predicted, sobel_filter)
 
     return tf.math.add(
             tf.math.scalar_mul(gamma, K.mean(K.square(sobel_target - sobel_predicted))),
             tf.math.scalar_mul((1-gamma), mse(target, predicted))
     )
-
-def sobel(input):
-    input_channels = K.reshape(K.ones_like(input[0, 0, 0, :]), (1, 1, -1, 1))
-    return sobel_filter * input_channels
 
 def load_images(image_directory: str,
                 n_images: int,
