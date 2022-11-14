@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import sparse
+from scipy.signal import convolve2d
 
 """
 Parameters for real implementation
@@ -20,8 +22,8 @@ N_t = 70
 class ForwardSolver:
 
     def __init__(self, 
-                N_x: int = 10,
-                N_y: int = 10,
+                N_x: int = 512,
+                N_y: int = 512,
                 N_s: int = 5,
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
@@ -41,15 +43,28 @@ class ForwardSolver:
 
     def init_simulation(self):
         # Calculate operators
-        I_k = np.eye(self.N)
-        D_k = np.diag(np.full(self.N, -2)) + np.diag(np.ones(self.N-1),1) + np.diag(np.ones(self.N-1),-1)
-        L = (1/self.delta_x**2)*(np.kron(D_k, I_k) + np.kron(I_k, D_k)) 
-        C = 1000*np.diag(self.wavelength) 
+        I_k = sparse.identity(self.N)
+        D_k = sparse.diags([1, -2, 1], [-1, 0, 1], shape=(self.N, self.N))
+        L = (1/self.delta_x**2)*(sparse.kron(D_k, I_k) + sparse.kron(I_k, D_k)) 
+        C = 1000*sparse.diags(self.wavelength, 0) 
 
         A = - C @ L @ C
 
-        u = np.ones((3, self.N_x * self.N_y, self.N_s)) # Stores past, current and future instances
+        u = np.zeros((3, self.N_x * self.N_y, self.N_s)) # Stores past, current and future instances
+        u[:, int(self.N_x * self.N_y / 2), :] = 1
         
+        #Below is for testing purposes
+        u = u.reshape(3, self.N_x, self.N_y, self.N_s) 
+        blur_kernel = np.array([[1, 2, 1], [2, 3, 2], [1, 2, 1]])
+        for i in range(3):
+            for j in range(self.N_s):
+                u[i, :, :, j] = convolve2d(u[i, :, :, j],
+                                           blur_kernel,
+                                           'same',
+                                           'symm') 
+
+        u = u.reshape(3, self.N_x*self.N_y, self.N_s) 
+
         return u, A      
 
     def forward_solver(self):
@@ -63,13 +78,14 @@ class ForwardSolver:
             u[0] = (-self.delta_t**2 * A) @ u[1] - u[2] + 2*u[1]
             u[2] = u[1] 
             u[1] = u[0]
-            
-        plt.plot(u[0])
-        plt.show()
+            if i % 100 == 0:
+                plt.gray()
+                plt.imshow(u[0, :, 0].reshape(self.N, self.N)) 
+                plt.show()
 
 def main():
     
-    solver = ForwardSolver()
+    solver = ForwardSolver(N_t=1000)
     solver.forward_solver()
 
 if __name__ == "__main__":
