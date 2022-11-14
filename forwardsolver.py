@@ -20,8 +20,8 @@ N_t = 70
 class ForwardSolver:
 
     def __init__(self, 
-                N_x: int = 512,
-                N_y: int = 512,
+                N_x: int = 10,
+                N_y: int = 10,
                 N_s: int = 5,
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
@@ -48,7 +48,7 @@ class ForwardSolver:
 
         A = - C @ L @ C
 
-        u = np.ones((3, self.N_x * self.N_y)) # Stores past, current and future instances
+        u = np.ones((3, self.N_x * self.N_y, self.N_s)) # Stores past, current and future instances
         
         return u, A      
 
