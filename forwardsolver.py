@@ -85,7 +85,7 @@ class ForwardSolver:
 
 def main():
     
-    solver = ForwardSolver()
+    solver = ForwardSolver(N_t=1000)
     solver.forward_solver()
 
 if __name__ == "__main__":
