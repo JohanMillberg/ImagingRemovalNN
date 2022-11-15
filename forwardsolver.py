@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import sparse
-from scipy.signal import convolve2d
+import math
 
 """
 Parameters for real implementation
@@ -22,12 +22,13 @@ N_t = 70
 class ForwardSolver:
 
     def __init__(self, 
-                N_x: int = 512,
-                N_y: int = 512,
-                N_s: int = 5,
+                N_x: int = 160,
+                N_y: int = 160,
+                N_s: int = 50,
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
-                N_t: int = 70):
+                N_t: int = 70,
+                Bsrc_file: str = "Bsrc_T_small.txt"):
 
         self.N = N_x
         self.N_s = N_s
@@ -40,30 +41,26 @@ class ForwardSolver:
         self.delta_t = tau/20
 
         self.wavelength = np.ones(self.N**2)
+        self.Bsrc_file = Bsrc_file
 
+    def import_sources(self):
+        b = np.genfromtxt(self.Bsrc_file, delimiter=',')
+        return b
+        
     def init_simulation(self):
         # Calculate operators
         I_k = sparse.identity(self.N)
-        D_k = sparse.diags([1, -2, 1], [-1, 0, 1], shape=(self.N, self.N))
+        D_k = sparse.diags([1,-2,1],[-1,0,1], shape=(self.N,self.N))
         L = (1/self.delta_x**2)*(sparse.kron(D_k, I_k) + sparse.kron(I_k, D_k)) 
-        C = 1000*sparse.diags(self.wavelength, 0) 
+        C = 1000*sparse.diags(self.wavelength) 
 
         A = - C @ L @ C
 
         u = np.zeros((3, self.N_x * self.N_y, self.N_s)) # Stores past, current and future instances
-        u[:, int(self.N_x * self.N_y / 2), :] = 1
-        
-        #Below is for testing purposes
-        u = u.reshape(3, self.N_x, self.N_y, self.N_s) 
-        blur_kernel = np.array([[1, 2, 1], [2, 3, 2], [1, 2, 1]])
-        for i in range(3):
-            for j in range(self.N_s):
-                u[i, :, :, j] = convolve2d(u[i, :, :, j],
-                                           blur_kernel,
-                                           'same',
-                                           'symm') 
 
-        u = u.reshape(3, self.N_x*self.N_y, self.N_s) 
+        b = self.import_sources()
+        u[1] = b
+        u[0] = (-0.5* self.delta_t**2 * A) @ b + b
 
         return u, A      
 
@@ -75,13 +72,16 @@ class ForwardSolver:
         u, A = self.init_simulation()
 
         for i in range(1,len(time)-1):
-            u[0] = (-self.delta_t**2 * A) @ u[1] - u[2] + 2*u[1]
             u[2] = u[1] 
             u[1] = u[0]
-            if i % 100 == 0:
+            u[0] = (-self.delta_t**2 * A) @ u[1] - u[2] + 2*u[1]
+
+            # For displaying images
+            if i % 5 == 0:
                 plt.gray()
-                plt.imshow(u[0, :, 0].reshape(self.N, self.N)) 
-                plt.show()
+                plt.title('FD solution at t = %f' %time[i])
+                plt.imshow(u[0,:,0].reshape(self.N,self.N))
+                plt.show()        
 
 def main():
     
