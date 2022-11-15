@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import sparse
+import math
 
 """
 Parameters for real implementation
@@ -20,12 +22,13 @@ N_t = 70
 class ForwardSolver:
 
     def __init__(self, 
-                N_x: int = 10,
-                N_y: int = 10,
-                N_s: int = 5,
+                N_x: int = 160,
+                N_y: int = 160,
+                N_s: int = 50,
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
-                N_t: int = 70):
+                N_t: int = 70,
+                Bsrc_file: str = "Bsrc_T_small.txt"):
 
         self.N = N_x
         self.N_s = N_s
@@ -38,18 +41,27 @@ class ForwardSolver:
         self.delta_t = tau/20
 
         self.wavelength = np.ones(self.N**2)
+        self.Bsrc_file = Bsrc_file
 
+    def import_sources(self):
+        b = np.genfromtxt(self.Bsrc_file, delimiter=',')
+        return b
+        
     def init_simulation(self):
         # Calculate operators
-        I_k = np.eye(self.N)
-        D_k = np.diag(np.full(self.N, -2)) + np.diag(np.ones(self.N-1),1) + np.diag(np.ones(self.N-1),-1)
-        L = (1/self.delta_x**2)*(np.kron(D_k, I_k) + np.kron(I_k, D_k)) 
-        C = 1000*np.diag(self.wavelength) 
+        I_k = sparse.identity(self.N)
+        D_k = sparse.diags([1,-2,1],[-1,0,1], shape=(self.N,self.N))
+        L = (1/self.delta_x**2)*(sparse.kron(D_k, I_k) + sparse.kron(I_k, D_k)) 
+        C = 1000*sparse.diags(self.wavelength) 
 
         A = - C @ L @ C
 
-        u = np.ones((3, self.N_x * self.N_y, self.N_s)) # Stores past, current and future instances
-        
+        u = np.zeros((3, self.N_x * self.N_y, self.N_s)) # Stores past, current and future instances
+
+        b = self.import_sources()
+        u[1] = b
+        u[0] = (-0.5* self.delta_t**2 * A) @ b + b
+
         return u, A      
 
     def forward_solver(self):
@@ -60,12 +72,16 @@ class ForwardSolver:
         u, A = self.init_simulation()
 
         for i in range(1,len(time)-1):
-            u[0] = (-self.delta_t**2 * A) @ u[1] - u[2] + 2*u[1]
             u[2] = u[1] 
             u[1] = u[0]
-            
-        plt.plot(u[0])
-        plt.show()
+            u[0] = (-self.delta_t**2 * A) @ u[1] - u[2] + 2*u[1]
+
+            # For displaying images
+            if i % 5 == 0:
+                plt.gray()
+                plt.title('FD solution at t = %f' %time[i])
+                plt.imshow(u[0,:,0].reshape(self.N,self.N))
+                plt.show()        
 
 def main():
     
