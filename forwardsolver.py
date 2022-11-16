@@ -1,24 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import sparse
-import math
-import pickle
+from cholesky import mblockchol
 
-"""
-Parameters for real implementation
-N_s = 50
-N_x = N_y = 512
-c_0 = 1000 m/s
-offsets o_x = 25, o_y = 81
-Nim_x = 175
-Nim_y = 350
-spatial grid step delta_x = 0.0063
-
-Timestepping params 
-tau = 3.0303*10^-5
-delta_t = tau/20
-N_t = 70
-"""
 
 class ForwardSolver:
 
@@ -71,6 +55,11 @@ class ForwardSolver:
 
         return u, A, D, b 
 
+    def index(self,j):
+        ind_t = np.linspace(1, self.N_s, self.N_s) + self.N_s*j - 1
+        ind_list = [int(x) for x in ind_t]
+        return ind_list
+
     def forward_solver(self):
 
         # Discretize time
@@ -78,6 +67,8 @@ class ForwardSolver:
         time = np.linspace(0, T, num=2*self.N_t)
         u, A, D, b = self.init_simulation()
 
+        # counter for data D
+        c = 0
         for i in range(1,len(time)-1):
             u[2] = u[1] 
             u[1] = u[0] 
@@ -93,14 +84,27 @@ class ForwardSolver:
                 plt.imshow(D[i])
                 plt.show()"""
 
-        plt.imshow(D[0,:,:].reshape(self.N_s, self.N_s))
-        plt.show()
+        return D
+
+    def mass_matrix(self):
+        D = self.forward_solver()
+        M = np.zeros((self.N_s*self.N_t, self.N_s*self.N_t))
+
+        for i in range(self.N_t-1):
+            for j in range(self.N_t-1):
+                ind_i = self.index(i)
+                ind_j = self.index(j)
+
+                M[ind_i[0]:ind_i[-1]+1,ind_j[0]:ind_j[-1]+1] = 0.5 * (D[abs(i-j)] + D[abs(i+j)])
+
+        R = mblockchol(M, self.N_s, self.N_t)
+
+        print(R)
 
 def main():
-    
     solver = ForwardSolver()
-    solver.forward_solver()
+    solver.mass_matrix()
     
-
+    
 if __name__ == "__main__":
     main()
