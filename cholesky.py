@@ -28,7 +28,7 @@ def mblockchol(M, Ns, Nt):
     L = np.zeros([Ns*Nt, Ns*Nt])
 
     for k in range(1, Nt+1):
-        msum = np.zeros([Ns, Ns])
+        msum = np.zeros((Ns, Ns), dtype=np.float64)
         for j in range(1, k):
             msum = np.add(msum, \
                 np.matmul(L[ind(Ns, k)[0]:ind(Ns, k)[-1], ind(Ns, j)[0]:ind(Ns, j)[-1]],\
@@ -39,7 +39,7 @@ def mblockchol(M, Ns, Nt):
              sqrtm(np.subtract(M[ind(Ns, k)[0]:ind(Ns, k)[-1], ind(Ns, k)[0]:ind(Ns, k)[-1]],msum))
 
         for i in range(k, Nt+1):
-            msum = np.zeros([Ns, Ns])
+            msum = np.zeros((Ns, Ns), dtype=np.float64)
             for j in range(1, k):
                 msum = np.add(msum, \
                     np.matmul(L[ind(Ns, i)[0]:ind(Ns, i)[-1], ind(Ns, j)[0]:ind(Ns, j)[-1]],\
@@ -75,7 +75,7 @@ if __name__ == '__main__':
                   [4, 5, 6, 5, 4, 3],
                   [3, 4, 5, 6, 5, 4],
                   [2, 3, 4, 5, 6, 5],
-                  [1, 2, 3, 4, 5, 6]])
+                  [1, 2, 3, 4, 5, 6]], dtype=np.float64)
     #print(M)
 
     # Test cholesky function
