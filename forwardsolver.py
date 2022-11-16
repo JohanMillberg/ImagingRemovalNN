@@ -1,36 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import sparse
-import math
 from cholesky import mblockchol
-import pickle
+import pandas as pd
 
-"""
-Parameters for real implementation
-N_s = 50
-N_x = N_y = 512
-c_0 = 1000 m/s
-offsets o_x = 25, o_y = 81
-Nim_x = 175
-Nim_y = 350
-spatial grid step delta_x = 0.0063
-
-Timestepping params 
-tau = 3.0303*10^-5
-delta_t = tau/20
-N_t = 70
-"""
 
 class ForwardSolver:
 
     def __init__(self, 
-                N_x: int = 160,
-                N_y: int = 160,
+                N_x: int = 512,
+                N_y: int = 512,
                 N_s: int = 50,
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
                 N_t: int = 70,
-                Bsrc_file: str = "Bsrc_T_small.txt"):
+                Bsrc_file: str = "Bsrc_T.txt"):
 
         self.N = N_x
         self.N_s = N_s
@@ -43,16 +27,12 @@ class ForwardSolver:
         self.delta_t = tau/20
 
         self.wavelength = np.ones(self.N**2)
-        self.Bsrc_file = Bsrc_file
+        self.Bsrc_file = Bsrc_file 
 
     def import_sources(self):
-        b = np.genfromtxt(self.Bsrc_file, delimiter=',')
-
-        # filename = 'Bsrc_T'
-        # with open(filename, 'rb') as f:
-        #     b = pickle.load(f)
-
-        # b = pickle.load(open('Bsrc_T', 'rb'))
+        
+        b = np.loadtxt(self.Bsrc_file, delimiter =',')
+        np.reshape(b, (self.N_x * self.N_y, self.N_s))
 
         return b
         
@@ -71,86 +51,95 @@ class ForwardSolver:
         u[1] = b
         u[0] = (-0.5* self.delta_t**2 * A) @ b + b
 
-        return u, A      
+        D = np.zeros((2*self.N_t, self.N_s, self.N_s))
+        D[0] = np.transpose(b) @ u[1]
+
+        return u, A, D, b 
+
+    def index(self,j):
+        ind_t = np.linspace(0, self.N_s, self.N_s) + self.N_s*j 
+        ind_list = [int(x) for x in ind_t]
+        return ind_list
 
     def forward_solver(self):
 
         # Discretize time
         T = self.N_t * self.delta_t
-        time = np.linspace(0, T, num=self.N_t)
-        u, A = self.init_simulation()
+        time = np.linspace(0, T, num=2*self.N_t)
+        u, A, D, b = self.init_simulation()
 
+        # counter for data D
+        c = 0
         for i in range(1,len(time)-1):
             u[2] = u[1] 
-            u[1] = u[0]
+            u[1] = u[0] 
             u[0] = (-self.delta_t**2 * A) @ u[1] - u[2] + 2*u[1]
 
+            # Update data
+            D[i] = np.transpose(b) @ u[1]
+
             # For displaying images
-            # if i % 5 == 0:
-            #     plt.gray()
-            #     plt.title('FD solution at t = %f' %time[i])
-            #     plt.imshow(u[0,:,0].reshape(self.N,self.N))
-            #     plt.show()
-            
-        return u
+            """if i % 5 == 0:
+                plt.gray()
+                plt.title('FD solution at t = %f' %time[i])
+                plt.imshow(D[i])
+                plt.show()"""
 
-    def imaging_function(self):    
-        # Get the values of u
+        return D
 
-        # Which of the u's should one use? Thinking of when creating "U" from all "u(tau)"
-        # u, A = self.init_simulation()
-        u = self.forward_solver()
+    def mass_matrix(self):
+        D = self.forward_solver()
+        M = np.zeros((self.N_s*self.N_t, self.N_s*self.N_t))
 
-        # Create matrices which are needed: I, U, M (via U), R (via M), V (via R and U)
-        I = np.zeros((self.N_y, self.N_x))
-        M = np.zeros((self.N_s * self.N_t, self.N_s*self.N_t))
+        print(np.shape(D))
+        print(np.shape(M))
+        print(np.shape(D[abs(self.N_t-2 - 5)]))
+        #print(abs(70-2))
 
-        for k in range(0, 3):
-            for j in range(0, self.N_t):
-                for i in range(0, self.N_t):
-                    # Create the desired indexes to use for insertion
-                    i_ind = [int(x) for x in np.linspace(0, self.N_s, self.N_s) + i*self.N_s]
-                    j_ind = [int(y) for y in np.linspace(0, self.N_s, self.N_s) + j*self.N_s]
-                    
-                    # Compute middle solution of equation (2.2) 
-                    # M[j+k*self.N_s][i+k*self.N_s] = u[k][i].T @ u[k][j]
-                    M[j][i] = u[k][i].T @ u[k][j]
-                    print(u[k][i].T @ u[k][j])
-                    
-        #print(M)
+        for i in range(self.N_t):
+            for j in range(self.N_t):
+                ind_i = self.index(i)
+                ind_j = self.index(j)
 
-        print(f"Dimensions of M  = {np.shape(M)}\n")
+                M[ind_i[0]:ind_i[-1],ind_j[0]:ind_j[-1]] = 0.5 * (D[abs(i-j)] + D[abs(i+j)])
+                #print(D[abs(i-j)] + D[abs(i+j)]) 
+
+        print("------------")
         print(M)
+        print(np.shape(M))
 
-        print("Working with U_0")
-        print(np.shape(u))
-        for k in range(0, 3):
-            U_0 = u[k, :, :].reshape((self.N_x*self.N_y, self.N_t*self.N_s))
+        # mat = np.matrix(M)
+        # with open('outfile_M_matrix.txt') as f:
+        #     for line in mat:
+        #         np.savetxt(f, line, fmt='%.2f')
+        
 
-        M_0 = U_0.T @ U_0
+        # mat = np.matrix(M)
+        # df = pd.DataFrame(data=mat.astype(float))
+        # df.to_csv('outfile.csv', sep=' ', header=False, float_format='%.2f', index=False)
 
-        R_0 = mblockchol(M_0, self.N_s, self.N_t)
-
-        # Should be BIG "U" here and not "u"
-        V_0 = np.multiply(U_0, np.invert(R_0))
-        print("Finished calculating V_0")
-
-
-        # Problem right now = M is a singular matrix and we cannot do Cholesky Factorization
         R = mblockchol(M, self.N_s, self.N_t)
 
-        # Need to implement V_0
-        for i in range(0, self.N**2):
-            I[i] = np.linalg.norm(np.multiply(V_0[i], R))**2
+        print("\n WE HAVE CALCULATED R !!!!!!!")
+        print(R)
 
-        return I, V_0, R_0
+        print("\nSee if R is calculated correctly")
+        temp_R_mul = np.multiply(R.T, R)
+        # if temp_R_mul.all() == M.all():
+        if (temp_R_mul == M).all():
+            print("R is calculated correctly")
+        else:
+            print("R.T * R is not equal to M :( ")
+        
+
+        # mat_R = np.matrix(R)
+        # df = pd.DataFrame(data=mat_R.astype(float))
+        # df.to_csv('R_matrix_test_2.csv', sep=' ', header=False, float_format='%.2f', index=False)
 
 def main():
-    
     solver = ForwardSolver()
-    # solver.forward_solver()
-    solver.imaging_function()
-
-
+    solver.mass_matrix()
+    
+    
 if __name__ == "__main__":
     main()
