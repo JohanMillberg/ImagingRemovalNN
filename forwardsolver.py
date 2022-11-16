@@ -25,7 +25,7 @@ class ForwardSolver:
         self.N_t = N_t
         self.delta_t = tau/20
 
-        self.wavelength = np.ones(self.N**2)
+        self.wavelength = 1000*np.ones(self.N**2).astype('float64')
         self.Bsrc_file = Bsrc_file 
 
     def import_sources(self):
@@ -38,15 +38,19 @@ class ForwardSolver:
     def init_simulation(self):
         # Calculate operators
         I_k = sparse.identity(self.N)
-        D_k = sparse.diags([1,-2,1],[-1,0,1], shape=(self.N,self.N))
-        L = (1/self.delta_x**2)*(sparse.kron(D_k, I_k) + sparse.kron(I_k, D_k)) 
-        C = 1000*sparse.diags(self.wavelength) 
+        D_k = (1/self.delta_x**2)*sparse.diags([1,-2,1],[-1,0,1], shape=(self.N,self.N))
+        D_k = sparse.csr_matrix(D_k)
+        D_k[0,0] = -1
 
-        A = - C @ L @ C
+        L = (sparse.kron(D_k, I_k) + sparse.kron(I_k, D_k))
+        C = (sparse.diags(self.wavelength))
+
+        A = (- C @ L @ C)
 
         u = np.zeros((3, self.N_x * self.N_y, self.N_s)) # Stores past, current and future instances
 
         b = self.import_sources()
+
         u[1] = b
         u[0] = (-0.5* self.delta_t**2 * A) @ b + b
 
@@ -56,33 +60,25 @@ class ForwardSolver:
         return u, A, D, b 
 
     def index(self,j):
-        ind_t = np.linspace(1, self.N_s, self.N_s) + self.N_s*j - 1
+        ind_t = np.linspace(0, self.N_s, self.N_s) + self.N_s*j 
         ind_list = [int(x) for x in ind_t]
         return ind_list
 
     def forward_solver(self):
-
         # Discretize time
         T = self.N_t * self.delta_t
+        nts = T/self.tau
         time = np.linspace(0, T, num=2*self.N_t)
         u, A, D, b = self.init_simulation()
 
-        # counter for data D
-        c = 0
-        for i in range(1,len(time)-1):
+        for i in range(1,len(time)):
             u[2] = u[1] 
             u[1] = u[0] 
             u[0] = (-self.delta_t**2 * A) @ u[1] - u[2] + 2*u[1]
 
-            # Update data
-            D[i] = np.transpose(b) @ u[1]
-
-            # For displaying images
-            """if i % 5 == 0:
-                plt.gray()
-                plt.title('FD solution at t = %f' %time[i])
-                plt.imshow(D[i])
-                plt.show()"""
+            if (i % nts) == 0:
+                D[i] = np.transpose(b) @ u[1]
+                D[i] = 0.5*(D[i].T + D[i])
 
         return D
 
@@ -90,21 +86,19 @@ class ForwardSolver:
         D = self.forward_solver()
         M = np.zeros((self.N_s*self.N_t, self.N_s*self.N_t))
 
-        for i in range(self.N_t-1):
-            for j in range(self.N_t-1):
+        for i in range(self.N_t):
+            for j in range(self.N_t):
                 ind_i = self.index(i)
                 ind_j = self.index(j)
 
-                M[ind_i[0]:ind_i[-1]+1,ind_j[0]:ind_j[-1]+1] = 0.5 * (D[abs(i-j)] + D[abs(i+j)])
+                M[ind_i[0]:ind_i[-1],ind_j[0]:ind_j[-1]] = 0.5 * (D[abs(i-j)] + D[abs(i+j)])
 
         R = mblockchol(M, self.N_s, self.N_t)
-
         print(R)
 
 def main():
     solver = ForwardSolver()
     solver.mass_matrix()
-    
     
 if __name__ == "__main__":
     main()
