@@ -1,24 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import sparse
-import math
-import pickle
+from cholesky import mblockchol
 
-"""
-Parameters for real implementation
-N_s = 50
-N_x = N_y = 512
-c_0 = 1000 m/s
-offsets o_x = 25, o_y = 81
-Nim_x = 175
-Nim_y = 350
-spatial grid step delta_x = 0.0063
-
-Timestepping params 
-tau = 3.0303*10^-5
-delta_t = tau/20
-N_t = 70
-"""
 
 class ForwardSolver:
 
@@ -29,6 +13,7 @@ class ForwardSolver:
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
                 N_t: int = 70,
+                background_velocity: float = 1000,
                 Bsrc_file: str = "Bsrc_T.txt"):
 
         self.N = N_x
@@ -41,12 +26,14 @@ class ForwardSolver:
         self.N_t = N_t
         self.delta_t = tau/20
 
-        self.wavelength = np.ones(self.N**2)
+        self.background_velocity = np.full(self.N**2,
+                                           background_velocity,
+                                           dtype=np.float64)
         self.Bsrc_file = Bsrc_file 
 
     def import_sources(self):
         
-        b = np.loadtxt(self.Bsrc_file, delimiter =',')
+        b = np.loadtxt(self.Bsrc_file, delimiter =',', dtype=np.float64)
         np.reshape(b, (self.N_x * self.N_y, self.N_s))
 
         return b
@@ -54,53 +41,70 @@ class ForwardSolver:
     def init_simulation(self):
         # Calculate operators
         I_k = sparse.identity(self.N)
-        D_k = sparse.diags([1,-2,1],[-1,0,1], shape=(self.N,self.N))
-        L = (1/self.delta_x**2)*(sparse.kron(D_k, I_k) + sparse.kron(I_k, D_k)) 
-        C = 1000*sparse.diags(self.wavelength) 
+        D_k = (1/self.delta_x**2)*sparse.diags([1,-2,1],[-1,0,1], shape=(self.N,self.N), dtype=np.float64)
+        D_k = sparse.csr_matrix(D_k)
+        D_k[0, 0] = -1 * (1/self.delta_x**2)
 
-        A = - C @ L @ C
+        L = sparse.kron(D_k, I_k) + sparse.kron(I_k, D_k)
+        C = sparse.diags(self.background_velocity, 0, dtype=np.float64)
 
-        u = np.zeros((3, self.N_x * self.N_y, self.N_s)) # Stores past, current and future instances
+        A = (- C @ L @ C)
+
+        u = np.zeros((3, self.N_x * self.N_y, self.N_s), dtype=np.float64) # Stores past, current and future instances
 
         b = self.import_sources()
+
         u[1] = b
         u[0] = (-0.5* self.delta_t**2 * A) @ b + b
 
-        D = np.zeros((2*self.N_t, self.N_s, self.N_s))
+        D = np.zeros((2*self.N_t, self.N_s, self.N_s), dtype=np.float64)
         D[0] = np.transpose(b) @ u[1]
 
         return u, A, D, b 
 
-    def forward_solver(self):
+    def index(self,j):
+        ind_t = np.linspace(0, self.N_s, self.N_s) + self.N_s*j 
+        ind_list = [int(x) for x in ind_t]
+        return ind_list
 
+    def forward_solver(self):
         # Discretize time
         T = self.N_t * self.delta_t
+        nts = 20
         time = np.linspace(0, T, num=2*self.N_t)
         u, A, D, b = self.init_simulation()
 
-        for i in range(1,len(time)-1):
+        for i in range(1,len(time)):
             u[2] = u[1] 
             u[1] = u[0] 
             u[0] = (-self.delta_t**2 * A) @ u[1] - u[2] + 2*u[1]
 
-            # Update data
-            D[i] = np.transpose(b) @ u[1]
+            if (i % nts) == 0:
+                D[i] = np.transpose(b) @ u[1]
+                D[i] = 0.5*(D[i].T + D[i])
 
-            # For displaying images
-            """if i % 5 == 0:
-                plt.gray()
-                plt.title('FD solution at t = %f' %time[i])
-                plt.imshow(D[i])
-                plt.show()"""
+        return D
 
-        plt.imshow(D[0,:,:].reshape(self.N_s, self.N_s))
-        plt.show()
+    def mass_matrix(self):
+        D = self.forward_solver()
+        M = np.zeros((self.N_s*self.N_t, self.N_s*self.N_t), dtype=np.float64)
+
+        for i in range(self.N_t):
+            for j in range(self.N_t):
+                ind_i = self.index(i)
+                ind_j = self.index(j)
+
+                M[ind_i[0]:ind_i[-1],ind_j[0]:ind_j[-1]] = 0.5 * (D[abs(i-j)] + D[abs(i+j)])
+
+        R = mblockchol(M, self.N_s, self.N_t)
+        print(R)
+        eigs = np.linalg.eigvals(M)
+        print(np.max(eigs))
+        print(np.min(eigs))
 
 def main():
+    solver = ForwardSolver()
+    solver.mass_matrix()
     
-    solver = ForwardSolver(N_t=1000)
-    solver.forward_solver()
-    
-
 if __name__ == "__main__":
     main()
