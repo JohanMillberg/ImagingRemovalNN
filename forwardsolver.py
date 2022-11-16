@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import sparse
 import math
+import pickle
 
 """
 Parameters for real implementation
@@ -22,13 +23,13 @@ N_t = 70
 class ForwardSolver:
 
     def __init__(self, 
-                N_x: int = 160,
-                N_y: int = 160,
+                N_x: int = 512,
+                N_y: int = 512,
                 N_s: int = 50,
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
                 N_t: int = 70,
-                Bsrc_file: str = "Bsrc_T_small.txt"):
+                Bsrc_file: str = "Bsrc_T.txt"):
 
         self.N = N_x
         self.N_s = N_s
@@ -41,10 +42,13 @@ class ForwardSolver:
         self.delta_t = tau/20
 
         self.wavelength = np.ones(self.N**2)
-        self.Bsrc_file = Bsrc_file
+        self.Bsrc_file = Bsrc_file 
 
     def import_sources(self):
-        b = np.genfromtxt(self.Bsrc_file, delimiter=',')
+        
+        b = np.loadtxt(self.Bsrc_file, delimiter =',')
+        np.reshape(b, (self.N_x * self.N_y, self.N_s))
+
         return b
         
     def init_simulation(self):
@@ -62,31 +66,41 @@ class ForwardSolver:
         u[1] = b
         u[0] = (-0.5* self.delta_t**2 * A) @ b + b
 
-        return u, A      
+        D = np.zeros((2*self.N_t, self.N_s, self.N_s))
+        D[0] = np.transpose(b) @ u[1]
+
+        return u, A, D, b 
 
     def forward_solver(self):
 
         # Discretize time
         T = self.N_t * self.delta_t
-        time = np.linspace(0, T, num=self.N_t)
-        u, A = self.init_simulation()
+        time = np.linspace(0, T, num=2*self.N_t)
+        u, A, D, b = self.init_simulation()
 
         for i in range(1,len(time)-1):
             u[2] = u[1] 
-            u[1] = u[0]
+            u[1] = u[0] 
             u[0] = (-self.delta_t**2 * A) @ u[1] - u[2] + 2*u[1]
 
+            # Update data
+            D[i] = np.transpose(b) @ u[1]
+
             # For displaying images
-            if i % 5 == 0:
+            """if i % 5 == 0:
                 plt.gray()
                 plt.title('FD solution at t = %f' %time[i])
-                plt.imshow(u[0,:,0].reshape(self.N,self.N))
-                plt.show()        
+                plt.imshow(D[i])
+                plt.show()"""
+
+        plt.imshow(D[0,:,:].reshape(self.N_s, self.N_s))
+        plt.show()
 
 def main():
     
     solver = ForwardSolver(N_t=1000)
     solver.forward_solver()
+    
 
 if __name__ == "__main__":
     main()
