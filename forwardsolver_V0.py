@@ -144,8 +144,11 @@ class ForwardSolver:
         Then only np.linalg.norm()**2 for each i in 1, .., N_x_im*N_y_im
         """
         I = np.zeros((self.N_y_im * self.N_x_im), dtype = np.float64)
+
+        print(f"Shape of input to norm: {np.shape(V_0[1, :] @ R)}")
+
         for i in range(self.N_x_im*self.N_y_im):
-            I[i] = np.linalg.norm(V_0[i, :] @ R)**2
+            I[i] = np.linalg.norm(V_0[i, :] @ R, 2)**2
 
         return I
 
@@ -155,3 +158,12 @@ def main():
     
 if __name__ == "__main__":
     main()
+
+
+#### Questions to Jörn:
+# All values of I = 3.5e+09. Should it be like this? Values and size?
+# If not? What should change?
+
+# What do you mean by "flag" in the last text?
+
+# V_0 = values look like they are the same over the columns, should it be like this?
