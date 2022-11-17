@@ -13,11 +13,12 @@ class ForwardSolver:
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
                 N_t: int = 70,
+                background_velocity_value: float = 1000,
                 Bsrc_file: str = "Bsrc_T.txt",
-                N_x_im: int = 350,
-                N_y_im: int = 175,
-                O_x: int = 81,
-                O_y: int = 25):
+                N_x_im: int = 175,
+                N_y_im: int = 350,
+                O_x: int = 25,
+                O_y: int = 81):
 
         self.N = N_x
         self.N_s = N_s
@@ -32,13 +33,16 @@ class ForwardSolver:
         self.tau = tau
         self.N_t = N_t
         self.delta_t = tau/20
+        self.background_velocity_value = background_velocity_value
 
-        self.wavelength = 1000*np.ones(self.N**2).astype('float64')
+        self.background_velocity = np.full(self.N**2,
+                                           background_velocity_value,
+                                           dtype=np.float64)
         self.Bsrc_file = Bsrc_file 
 
     def import_sources(self):
         
-        b = np.loadtxt(self.Bsrc_file, delimiter =',')
+        b = np.loadtxt(self.Bsrc_file, delimiter =',', dtype=np.float64)
         np.reshape(b, (self.N_x * self.N_y, self.N_s))
 
         return b
@@ -46,23 +50,23 @@ class ForwardSolver:
     def init_simulation(self):
         # Calculate operators
         I_k = sparse.identity(self.N)
-        D_k = (1/self.delta_x**2)*sparse.diags([1,-2,1],[-1,0,1], shape=(self.N,self.N))
+        D_k = (1/self.delta_x**2)*sparse.diags([1,-2,1],[-1,0,1], shape=(self.N,self.N), dtype=np.float64)
         D_k = sparse.csr_matrix(D_k)
-        D_k[0,0] = -1
+        D_k[0, 0] = -1 * (1/self.delta_x**2)
 
-        L = (sparse.kron(D_k, I_k) + sparse.kron(I_k, D_k))
-        C = (sparse.diags(self.wavelength))
+        L = sparse.kron(D_k, I_k) + sparse.kron(I_k, D_k)
+        C = sparse.diags(self.background_velocity, 0, dtype=np.float64)
 
         A = (- C @ L @ C)
 
-        u = np.zeros((3, self.N_x * self.N_y, self.N_s)) # Stores past, current and future instances
+        u = np.zeros((3, self.N_x * self.N_y, self.N_s), dtype=np.float64) # Stores past, current and future instances
 
         b = self.import_sources()
 
         u[1] = b
         u[0] = (-0.5* self.delta_t**2 * A) @ b + b
 
-        D = np.zeros((2*self.N_t, self.N_s, self.N_s))
+        D = np.zeros((2*self.N_t, self.N_s, self.N_s), dtype=np.float64)
         D[0] = np.transpose(b) @ u[1]
 
         return u, A, D, b 
@@ -75,7 +79,7 @@ class ForwardSolver:
     def forward_solver(self):
         # Discretize time
         T = self.N_t * self.delta_t
-        nts = T/self.tau
+        nts = 20
         time = np.linspace(0, T, num=2*self.N_t)
         u, A, D, b = self.init_simulation()
 
@@ -92,7 +96,7 @@ class ForwardSolver:
 
     def mass_matrix(self):
         D = self.forward_solver()
-        M = np.zeros((self.N_s*self.N_t, self.N_s*self.N_t))
+        M = np.zeros((self.N_s*self.N_t, self.N_s*self.N_t), dtype=np.float64)
 
         for i in range(self.N_t):
             for j in range(self.N_t):
@@ -102,9 +106,20 @@ class ForwardSolver:
                 M[ind_i[0]:ind_i[-1],ind_j[0]:ind_j[-1]] = 0.5 * (D[abs(i-j)] + D[abs(i+j)])
 
         R = mblockchol(M, self.N_s, self.N_t)
-        print(R)
+        # print(R)
+        # eigs = np.linalg.eigvals(M)
+        # print(np.max(eigs))
+        # print(np.min(eigs))
+
+        return M, D, R
     
     ### New
+
+    def index_im(self, o_z, N_z, j):
+        ind_t = np.linspace(o_z, N_z + o_z, N_z) + N_z*j 
+        ind_list = [int(x) for x in ind_t]
+        return ind_list
+
     def background_snapshots(self):
         """
         Function to calculate the orthogonalized background snapshots V_0
@@ -116,13 +131,49 @@ class ForwardSolver:
 
         DOUBLE CHECK DIMENSIONS OF O_x, O_y, N_x_im, N_y_im
         """
-        u, A, D, b = self.init_simulation()
+        #u, A, D, b = self.init_simulation()
         # u_0 = u[:, self.O_x:(self.O_x+self.N_x_im), self.O_y:(self.O_y+self.N_y_im)]
         
         # Look at code in main to get the constant background velocity of 1000 over all vectors of small u
-        U_0 = 1000*sparse.diags(self.wavelength)
-    
-        print(np.shape(U_0))
+        U_0 = self.background_velocity_value*np.ones((self.N_x_im * self.N_y_im, self.N_t*self.N_s), dtype=np.float64)
+        # print(np.shape(U_0))
+
+        M, D, R = self.mass_matrix()
+        M_0 = np.zeros((self.N_x_im * self.N_y_im, self.N_t*self.N_s), dtype = np.float64)
+        print(f"Original shape of M_0 = {np.shape(M_0)}")
+        
+        # for j in range(self.N_t):
+        #     for i in range(self.N_t):
+        #         ind_j = self.index(j)
+        #         ind_i = self.index(i)
+
+        #         ind_oy = self.index_im(self.O_y, self.N_y_im, j)
+        #         ind_ox = self.index_im(self.O_x, self.N_x_im, i)
+
+        #         M_0[ind_i[0]:ind_i[-1],ind_j[0]:ind_j[-1]] = M[ind_oy[0]:ind_oy[-1], ind_ox[0]:ind_ox[-1]]
+        
+
+        # for j in range(self.O_y, self.O_y + self.N_y_im + 1):
+        #     for i in range(self.O_x, self.O_x + self.N_x_im + 1):
+        #         print(f"j = {j}")
+        #         print(f"i = {i}")
+        #         # M_0[j%self.O_y, i%self.O_x] = M[j, i]
+        #         M_0[j%self.N_y_im, i%self.N_x_im] = M[j, i]
+        #         print(M[j, i])
+
+        # R_0 = mblockchol(M_0, self.N_s, self.N_t)
+
+        #M_0 = M[self.O_y * self.O_x : (self.O_y+self.N_y_im) * (self.O_x+self.N_x_im) + 1, : ]
+
+        # print(M_0)
+        # print(np.shape(M_0))
+
+        V_0 = U_0 @ np.linalg.inv(R)
+
+        print(np.shape(V_0))
+        print(V_0)
+        
+
 
 
     def imaging_func(self, V_0, R):
