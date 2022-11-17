@@ -135,7 +135,9 @@ class ForwardSolver:
         # u_0 = u[:, self.O_x:(self.O_x+self.N_x_im), self.O_y:(self.O_y+self.N_y_im)]
         
         # Look at code in main to get the constant background velocity of 1000 over all vectors of small u
-        U_0 = self.background_velocity_value*np.ones((self.N_x_im * self.N_y_im, self.N_t*self.N_s), dtype=np.float64)
+        U_0 = np.full((self.N_x_im * self.N_y_im, self.N_t * self.N_s),
+                       self.background_velocity_value,
+                       dtype=np.float64)
         # print(np.shape(U_0))
 
         M, D, R = self.mass_matrix()
