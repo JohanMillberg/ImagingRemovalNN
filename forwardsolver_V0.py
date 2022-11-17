@@ -158,12 +158,3 @@ def main():
     
 if __name__ == "__main__":
     main()
-
-
-#### Questions to Jörn:
-# All values of I = 3.5e+09. Should it be like this? Values and size?
-# If not? What should change?
-
-# What do you mean by "flag" in the last text?
-
-# V_0 = values look like they are the same over the columns, should it be like this?
