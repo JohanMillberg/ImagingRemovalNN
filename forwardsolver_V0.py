@@ -124,51 +124,13 @@ class ForwardSolver:
         """
         Function to calculate the orthogonalized background snapshots V_0
         - size of V_0 = (N_x_im*N_y_im, N_s*N_t)
-
-        Calculate V_0 = U_0_im @ np.linalg.inv(R_0)
-        Calculate a new M_0 with new dimensions --> Calculate new R_0 with Cholesky
-        Use this R_0 to calculate V_0
-
-        DOUBLE CHECK DIMENSIONS OF O_x, O_y, N_x_im, N_y_im
         """
-        #u, A, D, b = self.init_simulation()
-        # u_0 = u[:, self.O_x:(self.O_x+self.N_x_im), self.O_y:(self.O_y+self.N_y_im)]
-        
-        # Look at code in main to get the constant background velocity of 1000 over all vectors of small u
+       
         U_0 = np.full((self.N_x_im * self.N_y_im, self.N_t * self.N_s),
                        self.background_velocity_value,
                        dtype=np.float64)
-        # print(np.shape(U_0))
 
         M, D, R = self.mass_matrix()
-        M_0 = np.zeros((self.N_x_im * self.N_y_im, self.N_t*self.N_s), dtype = np.float64)
-        print(f"Original shape of M_0 = {np.shape(M_0)}")
-        
-        # for j in range(self.N_t):
-        #     for i in range(self.N_t):
-        #         ind_j = self.index(j)
-        #         ind_i = self.index(i)
-
-        #         ind_oy = self.index_im(self.O_y, self.N_y_im, j)
-        #         ind_ox = self.index_im(self.O_x, self.N_x_im, i)
-
-        #         M_0[ind_i[0]:ind_i[-1],ind_j[0]:ind_j[-1]] = M[ind_oy[0]:ind_oy[-1], ind_ox[0]:ind_ox[-1]]
-        
-
-        # for j in range(self.O_y, self.O_y + self.N_y_im + 1):
-        #     for i in range(self.O_x, self.O_x + self.N_x_im + 1):
-        #         print(f"j = {j}")
-        #         print(f"i = {i}")
-        #         # M_0[j%self.O_y, i%self.O_x] = M[j, i]
-        #         M_0[j%self.N_y_im, i%self.N_x_im] = M[j, i]
-        #         print(M[j, i])
-
-        # R_0 = mblockchol(M_0, self.N_s, self.N_t)
-
-        #M_0 = M[self.O_y * self.O_x : (self.O_y+self.N_y_im) * (self.O_x+self.N_x_im) + 1, : ]
-
-        # print(M_0)
-        # print(np.shape(M_0))
 
         V_0 = U_0 @ np.linalg.inv(R)
 
@@ -183,7 +145,8 @@ class ForwardSolver:
     def imaging_func(self, V_0, R):
         """
         Imaging function at a point.
-        Find good way to use R and V_0! Then only np.linalg.norm()**2 for each i in 1, .., N_x_im*N_y_im
+        Find good way to use R and V_0! 
+        Then only np.linalg.norm()**2 for each i in 1, .., N_x_im*N_y_im
         """
         I = np.zeros((self.N_y_im * self.N_x_im), dtype = np.float64)
         for i in range(self.N_x_im*self.N_y_im):
