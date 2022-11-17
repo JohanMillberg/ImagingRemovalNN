@@ -126,8 +126,8 @@ def load_images(image_directory: str,
 
 
 def preprocess_data(train_images: np.array, test_images: np.array):
-    train_normalized = train_images.astype(float) / np.max(train_images)
-    test_normalized = test_images.astype(float) / np.max(test_images)
+    train_normalized = train_images.astype(np.float32) / np.max(train_images)
+    test_normalized = test_images.astype(np.float32) / np.max(test_images)
 
     return train_normalized, test_normalized
 

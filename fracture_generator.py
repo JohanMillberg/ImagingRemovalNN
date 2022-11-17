@@ -192,9 +192,9 @@ class FractureGenerator:
 
 
 def normalize_image(image: np.array):
-    # normalized = tf.cast(image, dtype=tf.float32)
+    normalized = image.astype(np.float32)
     # normalized = normalized / tf.reduce_max(tf.abs(normalized))
-    normalized = image.astype(float) / np.max(image)
+    normalized = normalized / np.max(normalized)
 
     return normalized
 
@@ -214,7 +214,7 @@ def main():
     mean_noise = 1.0
     std_dev_noise = 0.2
     max_iterations = 15
-    n_images_to_generate = 10
+    n_images_to_generate = 1000
     background_velocity = 1000
 
     generator = FractureGenerator(image_width,
