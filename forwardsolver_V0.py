@@ -177,6 +177,7 @@ class ForwardSolver:
         
         I = self.imaging_func(V_0, R)
         print(I)
+        np.savetxt("I_result.txt", I)
 
 
     def imaging_func(self, V_0, R):
@@ -184,9 +185,9 @@ class ForwardSolver:
         Imaging function at a point.
         Find good way to use R and V_0! Then only np.linalg.norm()**2 for each i in 1, .., N_x_im*N_y_im
         """
-        I = np.array([0, self.N_y_im, self.N_x_im], dtype = np.float64)
+        I = np.zeros((self.N_y_im * self.N_x_im), dtype = np.float64)
         for i in range(self.N_x_im*self.N_y_im):
-            I[i] = np.linalg.norm(V_0[i], np.linalg.inv(R))**2
+            I[i] = np.linalg.norm(V_0[i, :] @ R)**2
 
         return I
 
