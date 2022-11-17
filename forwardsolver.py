@@ -30,6 +30,8 @@ class ForwardSolver:
         self.O_x = O_x
         self.O_y = O_y
 
+        self.imaging_region_indices = self.get_imaging_region_indices()
+
         self.tau = tau
         self.N_t = N_t
         self.delta_t = tau/20
@@ -46,7 +48,14 @@ class ForwardSolver:
         np.reshape(b, (self.N_x * self.N_y, self.N_s))
 
         return b
-        
+
+    def get_imaging_region_indices(self):
+        im_y_indices = range(self.O_y, self.O_y+self.N_y_im)
+        im_x_indices = range(self.O_x, self.O_x+self.N_x_im)
+        indices = [y*self.N_x + x for y in im_y_indices for x in im_x_indices] 
+
+        return indices
+                    
     def init_simulation(self):
         # Calculate operators
         I_k = sparse.identity(self.N)
@@ -91,6 +100,7 @@ class ForwardSolver:
             if (i % nts) == 0:
                 D[i] = np.transpose(b) @ u[1]
                 D[i] = 0.5*(D[i].T + D[i])
+                U[:, i*self.N_s:i*self.N_s+N_s] = u[0]
 
         return D
 
@@ -106,12 +116,19 @@ class ForwardSolver:
                 M[ind_i[0]:ind_i[-1],ind_j[0]:ind_j[-1]] = 0.5 * (D[abs(i-j)] + D[abs(i+j)])
 
         R = mblockchol(M, self.N_s, self.N_t)
-        print(R)
-        eigs = np.linalg.eigvals(M)
-        print(np.max(eigs))
-        print(np.min(eigs))
+        # print(R)
+        # eigs = np.linalg.eigvals(M)
+        # print(np.max(eigs))
+        # print(np.min(eigs))
 
         return M, D, R
+    
+    ### New
+
+    def index_im(self, o_z, N_z, j):
+        ind_t = np.linspace(o_z, N_z + o_z, N_z) + N_z*j 
+        ind_list = [int(x) for x in ind_t]
+        return ind_list
 
     def background_snapshots(self):
         """
@@ -134,7 +151,6 @@ class ForwardSolver:
         print(I)
         np.savetxt("I_result.txt", I)
 
-
     def imaging_func(self, V_0, R):
         """
         Imaging function at a point.
@@ -142,9 +158,6 @@ class ForwardSolver:
         Then only np.linalg.norm()**2 for each i in 1, .., N_x_im*N_y_im
         """
         I = np.zeros((self.N_y_im * self.N_x_im), dtype = np.float64)
-
-        print(f"Shape of input to norm: {np.shape(V_0[1, :] @ R)}")
-
         for i in range(self.N_x_im*self.N_y_im):
             I[i] = np.linalg.norm(V_0[i, :] @ R, 2)**2
 
