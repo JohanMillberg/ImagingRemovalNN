@@ -115,11 +115,6 @@ class ForwardSolver:
     
     ### New
 
-    def index_im(self, o_z, N_z, j):
-        ind_t = np.linspace(o_z, N_z + o_z, N_z) + N_z*j 
-        ind_list = [int(x) for x in ind_t]
-        return ind_list
-
     def background_snapshots(self):
         """
         Function to calculate the orthogonalized background snapshots V_0
