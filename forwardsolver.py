@@ -13,7 +13,7 @@ class ForwardSolver:
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
                 N_t: int = 70,
-                background_velocity: float = 1000,
+                background_velocity_value: float = 1000,
                 Bsrc_file: str = "Bsrc_T.txt"):
 
         self.N = N_x
