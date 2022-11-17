@@ -117,9 +117,9 @@ class ForwardSolver:
         # df.to_csv('R_matrix_test_2.csv', sep=' ', header=False, float_format='%.2f', index=False)
 
 def main():
-    solver = ForwardSolver()
-    solver.mass_matrix()
     
-    
+    solver = ForwardSolver(N_t=1000)
+    solver.forward_solver()
+
 if __name__ == "__main__":
     main()
