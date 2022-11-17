@@ -13,21 +13,30 @@ class ForwardSolver:
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
                 N_t: int = 70,
-                background_velocity: float = 1000,
-                Bsrc_file: str = "Bsrc_T.txt"):
+                background_velocity_value: float = 1000,
+                Bsrc_file: str = "Bsrc_T.txt",
+                N_x_im: int = 175,
+                N_y_im: int = 350,
+                O_x: int = 25,
+                O_y: int = 81):
 
         self.N = N_x
         self.N_s = N_s
         self.N_x = N_x
         self.N_y = N_y
         self.delta_x = delta_x
+        self.N_x_im = N_x_im
+        self.N_y_im = N_y_im
+        self.O_x = O_x
+        self.O_y = O_y
 
         self.tau = tau
         self.N_t = N_t
         self.delta_t = tau/20
+        self.background_velocity_value = background_velocity_value
 
         self.background_velocity = np.full(self.N**2,
-                                           background_velocity,
+                                           background_velocity_value,
                                            dtype=np.float64)
         self.Bsrc_file = Bsrc_file 
 
@@ -102,9 +111,48 @@ class ForwardSolver:
         print(np.max(eigs))
         print(np.min(eigs))
 
+        return M, D, R
+
+    def background_snapshots(self):
+        """
+        Function to calculate the orthogonalized background snapshots V_0
+        - size of V_0 = (N_x_im*N_y_im, N_s*N_t)
+        """
+       
+        U_0 = np.full((self.N_x_im * self.N_y_im, self.N_t * self.N_s),
+                       self.background_velocity_value,
+                       dtype=np.float64)
+
+        M, D, R = self.mass_matrix()
+
+        V_0 = U_0 @ np.linalg.inv(R)
+
+        print(np.shape(V_0))
+        print(V_0)
+        
+        I = self.imaging_func(V_0, R)
+        print(I)
+        np.savetxt("I_result.txt", I)
+
+
+    def imaging_func(self, V_0, R):
+        """
+        Imaging function at a point.
+        Find good way to use R and V_0! 
+        Then only np.linalg.norm()**2 for each i in 1, .., N_x_im*N_y_im
+        """
+        I = np.zeros((self.N_y_im * self.N_x_im), dtype = np.float64)
+
+        print(f"Shape of input to norm: {np.shape(V_0[1, :] @ R)}")
+
+        for i in range(self.N_x_im*self.N_y_im):
+            I[i] = np.linalg.norm(V_0[i, :] @ R, 2)**2
+
+        return I
+
 def main():
     solver = ForwardSolver()
-    solver.mass_matrix()
+    solver.background_snapshots()
     
 if __name__ == "__main__":
     main()
