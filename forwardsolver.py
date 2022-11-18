@@ -4,7 +4,10 @@ from scipy import sparse
 from cholesky import mblockchol
 
 """
-File with U_0 code from Moa before meeting with Jörn 2022-11-17
+Code with Moa's U_0 code and Johan's indexing-function merged here together.
+Also plots a figure of I as it is right now!
+
+Runs without error messages but could be wrong.. :(
 """
 
 class ForwardSolver:
@@ -93,7 +96,7 @@ class ForwardSolver:
         T = self.N_t * self.delta_t
         nts = 20
         time = np.linspace(0, T, num=2*self.N_t)
-        # when finding u0
+        # when finding u0 (from Moa's smart brain at Jörn's office)
         #time = np.linspace(0, T, num=self.N_t)
 
         u, A, D, b = self.init_simulation()
@@ -101,6 +104,10 @@ class ForwardSolver:
         U_0 = np.zeros((self.N_x*self.N_y, self.N_s, self.N_t))
         U_0[:,:,0] = u[1]
 
+        ### Continue to look here how many times the values are being stored in D-matrix and U_0-matrix
+        # Still only 6 and 3 times in the end... Maybe not that good...? Maybe this is  the error?
+        count_storage_D = 0
+        count_storage_U_0 = 0
         for i in range(1,len(time)):
             u[2] = u[1] 
             u[1] = u[0] 
@@ -110,10 +117,18 @@ class ForwardSolver:
                 D[i] = np.transpose(b) @ u[1]
                 D[i] = 0.5*(D[i].T + D[i])
 
+                count_storage_D += 1
+
                 if i <= self.N_t:
                     U_0[:,:,i] = u[1]
 
+                    count_storage_U_0 += 1
+
         U_0 = np.reshape(U_0, (self.N_x * self.N_y, self.N_s * self.N_t))
+
+        print(f"Count D = {count_storage_D}")
+        print(f"Count stage U_0 = {count_storage_U_0}")
+
         return D, U_0
 
     def mass_matrix(self):
@@ -140,39 +155,22 @@ class ForwardSolver:
         Function to calculate the orthogonalized background snapshots V_0
         - size of V_0 = (N_x_im*N_y_im, N_s*N_t)
         """
-       
-        # U_0 = np.full((self.N_x_im * self.N_y_im, self.N_t * self.N_s),
-        #                self.background_velocity_value,
-        #                dtype=np.float64)
 
         # Import U_0
         D, U_0_temp = self.forward_solver()
+
         # Only take the part of U_0 which is in the imaging region
-
         ind = self.get_imaging_region_indices()
-        # print(ind)
-        # print(np.shape(ind))
-
-        # print(f"Shape of U_0: {np.shape(U_0_temp[ind])}")
-
         U_0 = U_0_temp[ind]
-
-        # for i in range(self.N_t*self.N_s):
-        #     U_0[i, :]
-            
-        # for j in range(self.N_x_o)
-        # U_0 = U_0[]
 
         # Since only background velocity as it is right now, we have R = R_0
         M, R = self.mass_matrix()
 
         V_0 = U_0 @ np.linalg.inv(R)
-
         print(np.shape(V_0))
-        print(V_0)
         
         I = self.imaging_func(V_0, R)
-        print(I)
+        print(np.shape(I))
         np.savetxt("I_result.txt", I)
 
 
@@ -183,17 +181,40 @@ class ForwardSolver:
         Then only np.linalg.norm()**2 for each i in 1, .., N_x_im*N_y_im
         """
         I = np.zeros((self.N_y_im * self.N_x_im), dtype = np.float64)
-
-        print(f"Shape of input to norm: {np.shape(V_0[1, :] @ R)}")
+        # print(f"Shape of input to norm: {np.shape(V_0[1, :] @ R)}")
 
         for i in range(self.N_x_im*self.N_y_im):
             I[i] = np.linalg.norm(V_0[i, :] @ R, 2)**2
 
         return I
+    
+    def plot_intensity_I(self):
+        """
+        Function to plot a colormap of the values stored in I.
+        """
+        I = np.loadtxt("I_result.txt", dtype=np.float64)
+        data_temp = np.zeros((self.N_y_im, self.N_x_im), dtype=np.float64)
+
+        for j in range(self.N_x_im):
+            for i in range(self.N_y_im):
+                data_temp[i, j] = I[j + i]
+
+        plt.style.use('seaborn-white')
+        x = np.linspace(0, self.N_x_im, self.N_x_im)
+        y = np.linspace(0, self.N_y_im, self.N_y_im)
+
+        X, Y = np.meshgrid(x, y)
+        plt.contourf(Y, X, data_temp, cmap='RdGy')
+        plt.colorbar()
+        plt.title("Colormap of values stored in vector I")
+        plt.xlabel("x-coordinate/pixel")
+        plt.ylabel("y-coordinate/pixel")
+        plt.show()
 
 def main():
     solver = ForwardSolver()
-    solver.background_snapshots()
+    # solver.background_snapshots()
+    solver.plot_intensity_I()
     
 if __name__ == "__main__":
     main()
