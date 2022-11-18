@@ -3,6 +3,9 @@ import matplotlib.pyplot as plt
 from scipy import sparse
 from cholesky import mblockchol
 
+"""
+File with U_0 code from Moa before meeting with Jörn 2022-11-17
+"""
 
 class ForwardSolver:
 
@@ -30,6 +33,8 @@ class ForwardSolver:
         self.O_x = O_x
         self.O_y = O_y
 
+        self.imaging_region_indices = self.get_imaging_region_indices()
+
         self.tau = tau
         self.N_t = N_t
         self.delta_t = tau/20
@@ -46,6 +51,13 @@ class ForwardSolver:
         np.reshape(b, (self.N_x * self.N_y, self.N_s))
 
         return b
+    
+    def get_imaging_region_indices(self):
+        im_y_indices = range(self.O_y, self.O_y+self.N_y_im)
+        im_x_indices = range(self.O_x, self.O_x+self.N_x_im)
+        indices = [y*self.N_x + x for y in im_y_indices for x in im_x_indices] 
+
+        return indices
         
     def init_simulation(self):
         # Calculate operators
@@ -81,7 +93,13 @@ class ForwardSolver:
         T = self.N_t * self.delta_t
         nts = 20
         time = np.linspace(0, T, num=2*self.N_t)
+        # when finding u0
+        #time = np.linspace(0, T, num=self.N_t)
+
         u, A, D, b = self.init_simulation()
+
+        U_0 = np.zeros((self.N_x*self.N_y, self.N_s, self.N_t))
+        U_0[:,:,0] = u[1]
 
         for i in range(1,len(time)):
             u[2] = u[1] 
@@ -92,10 +110,14 @@ class ForwardSolver:
                 D[i] = np.transpose(b) @ u[1]
                 D[i] = 0.5*(D[i].T + D[i])
 
-        return D
+                if i <= self.N_t:
+                    U_0[:,:,i] = u[1]
+
+        U_0 = np.reshape(U_0, (self.N_x * self.N_y, self.N_s * self.N_t))
+        return D, U_0
 
     def mass_matrix(self):
-        D = self.forward_solver()
+        D, U_0 = self.forward_solver()
         M = np.zeros((self.N_s*self.N_t, self.N_s*self.N_t), dtype=np.float64)
 
         for i in range(self.N_t):
@@ -111,7 +133,7 @@ class ForwardSolver:
         print(np.max(eigs))
         print(np.min(eigs))
 
-        return M, D, R
+        return M, R
 
     def background_snapshots(self):
         """
@@ -119,11 +141,30 @@ class ForwardSolver:
         - size of V_0 = (N_x_im*N_y_im, N_s*N_t)
         """
        
-        U_0 = np.full((self.N_x_im * self.N_y_im, self.N_t * self.N_s),
-                       self.background_velocity_value,
-                       dtype=np.float64)
+        # U_0 = np.full((self.N_x_im * self.N_y_im, self.N_t * self.N_s),
+        #                self.background_velocity_value,
+        #                dtype=np.float64)
 
-        M, D, R = self.mass_matrix()
+        # Import U_0
+        D, U_0_temp = self.forward_solver()
+        # Only take the part of U_0 which is in the imaging region
+
+        ind = self.get_imaging_region_indices()
+        # print(ind)
+        # print(np.shape(ind))
+
+        # print(f"Shape of U_0: {np.shape(U_0_temp[ind])}")
+
+        U_0 = U_0_temp[ind]
+
+        # for i in range(self.N_t*self.N_s):
+        #     U_0[i, :]
+            
+        # for j in range(self.N_x_o)
+        # U_0 = U_0[]
+
+        # Since only background velocity as it is right now, we have R = R_0
+        M, R = self.mass_matrix()
 
         V_0 = U_0 @ np.linalg.inv(R)
 
@@ -156,3 +197,42 @@ def main():
     
 if __name__ == "__main__":
     main()
+
+
+### Question 1
+# Team padding VS Team shrinking?!?!?!?!?
+# What to do with elements/values not stored? What should we do there?
+## Answer: Do nothing. Everything is fixed thanks to delta_t = tau/20, and sample each 20:th time step
+# Everythingg gets correct dimensions
+#  Using the Nyqvist theorem/formula/sampling technique
+
+# If to shrink, how to cope with dimensions?
+## Answer: Solved above
+
+# If padding: 0 or background_velocity?
+## Answer: Solved above
+
+#### Question 2
+# Only get indexes from R to get R_0?
+## Answer: Before adding in any velocity c from the fractures, are R are the used R_0
+
+### Explaination from Jörn (with Lollos words) of how to use the background velocity when having fractures
+# Think like this: Use R_0 and U_0_im to find V_0, store R_0 and V_0
+# Then add the fractions into the program
+# Do the calculations with the mass matrix again to find the "real" R
+# Use V_0 and R to  calculate the true I
+
+
+##### Diskutera kod och hur den funkar
+# Skickar in U_0 i background_snapshots på något sätt
+# Plocka ur värden ur ett bra skapat U_0 med index funktion i Johans branch "indexing" 
+# (förutsatt att bilden är en lång vektor där elementen kommer radvis)
+
+# Ta hänsyn till dimensioner när vi räknar ut V_0
+# Ta in ett U_0 och använd index_funktion 
+
+# Indexera även R-matrisen så den blir R_0
+
+# Kolla U_0 värden efter Moas beräkningar!
+
+# Jörn = away until next wednesdqy
