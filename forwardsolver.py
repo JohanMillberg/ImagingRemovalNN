@@ -173,6 +173,9 @@ class ForwardSolver:
         print(np.shape(I))
         np.savetxt("I_result.txt", I)
 
+        #### This step does not work... :( Look at later!
+        self.plot_result_matrix(V_0, 'V_0', np.shape(V_0)[1], np.shape(V_0)[0])
+
 
     def imaging_func(self, V_0, R):
         """
@@ -188,9 +191,12 @@ class ForwardSolver:
 
         return I
     
+##### New by 2022-11-18 : try to plot to see if reasonable or not
     def plot_intensity_I(self):
         """
         Function to plot a colormap of the values stored in I.
+        First, store as a matrix over the grid.
+        Second, call the plot function to see how the results looks.
         """
         I = np.loadtxt("I_result.txt", dtype=np.float64)
         data_temp = np.zeros((self.N_y_im, self.N_x_im), dtype=np.float64)
@@ -198,23 +204,36 @@ class ForwardSolver:
         for j in range(self.N_x_im):
             for i in range(self.N_y_im):
                 data_temp[i, j] = I[j + i]
+        
+        #self.plot_result_matrix(data_temp, 'I', self.N_x_im, self.N_y_im)
+        self.plot_result_matrix(data_temp, 'I', np.shape(data_temp)[1], np.shape(data_temp)[0])
 
+
+    
+    def plot_result_matrix(self,
+                        matrix_results,
+                        matrix_name: str='matrix_results',
+                        x_dim: int= 175,
+                        y_dim: int= 150):
+        """
+        A function which plots the results in a matrix as a colormap!
+        """
         plt.style.use('seaborn-white')
-        x = np.linspace(0, self.N_x_im, self.N_x_im)
-        y = np.linspace(0, self.N_y_im, self.N_y_im)
+        x = np.linspace(0, x_dim, x_dim)
+        y = np.linspace(0, y_dim, y_dim)
 
         X, Y = np.meshgrid(x, y)
-        plt.contourf(Y, X, data_temp, cmap='RdGy')
+        plt.contourf(X, Y, matrix_results, cmap='RdGy')
         plt.colorbar()
-        plt.title("Colormap of values stored in vector I")
+        plt.title(f"Colormap of matrix {matrix_name}")
         plt.xlabel("x-coordinate/pixel")
         plt.ylabel("y-coordinate/pixel")
         plt.show()
 
 def main():
     solver = ForwardSolver()
-    # solver.background_snapshots()
-    solver.plot_intensity_I()
+    solver.background_snapshots()
+    #solver.plot_intensity_I()
     
 if __name__ == "__main__":
     main()
