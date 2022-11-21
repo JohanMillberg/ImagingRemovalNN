@@ -237,8 +237,8 @@ def main():
         result = np.expand_dims(result, 2)
 
         # Save the images
-        tf.keras.utils.save_img(
-            f"./images/fractured/im{i}.jpg",
+        np.save(
+            f"./images/fractured/im{i}.npy",
             result
         )
 
