@@ -93,16 +93,22 @@ class ForwardSolver:
 
     def forward_solver(self):
         # Discretize time
-        T = self.N_t * self.delta_t
         nts = 20
-        time = np.linspace(0, T, num=2*self.N_t)
+        #T = self.N_t * self.delta_t * nts
+        T = (self.N_t * 2 - 1) * self.delta_t * nts
+        time = np.linspace(0, T, num=2*self.N_t*nts)
         # when finding u0 (from Moa's smart brain at Jörn's office)
         #time = np.linspace(0, T, num=self.N_t)
 
         u, A, D, b = self.init_simulation()
 
-        U_0 = np.zeros((self.N_x*self.N_y, self.N_s, self.N_t))
-        U_0[:,:,0] = u[1]
+        # U_0 = np.zeros((self.N_x*self.N_y, self.N_s, self.N_t))
+        # U_0[:,:,0] = u[1]
+
+        # New
+        U_0 = np.zeros((self.N_x_im*self.N_y_im, self.N_s, self.N_t))
+        U_0[:,:,0] = u[1][self.O_x:self.O_x+self.N_x_im, self.O_y:self.O_y+self.N_y_im]
+        
 
         ### Continue to look here how many times the values are being stored in D-matrix and U_0-matrix
         # Still only 6 and 3 times in the end... Maybe not that good...? Maybe this is  the error?
@@ -114,13 +120,22 @@ class ForwardSolver:
             u[0] = (-self.delta_t**2 * A) @ u[1] - u[2] + 2*u[1]
 
             if (i % nts) == 0:
-                D[i] = np.transpose(b) @ u[1]
-                D[i] = 0.5*(D[i].T + D[i])
+                index = int(i/nts)
+                D[index] = np.transpose(b) @ u[1]
+                D[index] = 0.5*(D[index].T + D[index])
 
                 count_storage_D += 1
+                print(count_storage_D)
 
-                if i <= self.N_t:
-                    U_0[:,:,i] = u[1]
+                if i <= self.N_t*nts-1:
+                    #U_0[:,:,index] = u[1]
+                    
+                    # New
+                    U_0[:,:,index] = u[1][self.O_x:self.O_x+self.N_x_im, self.O_y:self.O_y+self.N_y_im]
+
+                    # Note to ourselves:
+                    # U_0 = np.reshape(U_0[U_0 in self.imaging_region_indices], (self.N_x_im * self.N_y_im, self.N_s * self.N_t))
+                    #U_0 = np.reshape(U_0[self.O_x:(self.N_x_im+self.O_x), self.O_y:(self.N_y_im+self.O_y)], (self.N_x_im * self.N_y_im, self.N_s * self.N_t))
 
                     count_storage_U_0 += 1
 
@@ -174,6 +189,9 @@ class ForwardSolver:
 
         #### This step does not work... :( Look at later!
         self.plot_result_matrix(V_0, 'V_0', np.shape(V_0)[1], np.shape(V_0)[0])
+        # Pick a few dimension and reshape to 2-dim and plot these instead
+        # one of the first, one around 500, one around
+        # one around each interval 0-50
 
 
     def imaging_func(self, V_0, R):
@@ -187,6 +205,7 @@ class ForwardSolver:
 
         for i in range(self.N_x_im*self.N_y_im):
             I[i] = np.linalg.norm(V_0[i, :] @ R, 2)**2
+        # look at V_0 times R, square all entries and then sum them into the 2nd dimensions
 
         return I
     
@@ -198,11 +217,12 @@ class ForwardSolver:
         Second, call the plot function to see how the results looks.
         """
         I = np.load("I_result.npy")
-        data_temp = np.zeros((self.N_y_im, self.N_x_im), dtype=np.float64)
+        #data_temp = np.zeros((self.N_y_im, self.N_x_im), dtype=np.float64)
+        data_temp = np.reshape(I, (self.N_y_im, self.N_x_im))
 
-        for j in range(self.N_x_im):
-            for i in range(self.N_y_im):
-                data_temp[i, j] = I[j + i]
+        # for j in range(self.N_x_im):
+        #     for i in range(self.N_y_im):
+        #         data_temp[i, j] = I[j + i]
         
         #self.plot_result_matrix(data_temp, 'I', self.N_x_im, self.N_y_im)
         self.plot_result_matrix(data_temp, 'I', np.shape(data_temp)[1], np.shape(data_temp)[0])
@@ -216,22 +236,41 @@ class ForwardSolver:
                         y_dim: int= 150):
         """
         A function which plots the results in a matrix as a colormap!
+
+        Choose a gradient color map
+        Try to insert a variation in C (fraction) and see if you can see it! 
+        See if algorithm finds the fractions.
+
+        Store the V's and send to Jörn!
         """
-        plt.style.use('seaborn-white')
+        #plt.style.use('seaborn-white')
+        plt.gray()
         x = np.linspace(0, x_dim, x_dim)
         y = np.linspace(0, y_dim, y_dim)
 
         X, Y = np.meshgrid(x, y)
-        plt.contourf(X, Y, matrix_results, cmap='RdGy')
+        #plt.contourf(X, Y, matrix_results, cmap='RdGy')
+        plt.imshow(np.squeeze(matrix_results)) 
         plt.colorbar()
         plt.title(f"Colormap of matrix {matrix_name}")
         plt.xlabel("x-coordinate/pixel")
         plt.ylabel("y-coordinate/pixel")
         plt.show()
 
+        # From the plot, get the axis, and set equal
+        # Try to transpose the image to get the width at the x-axis
+        # something that scales the axis according to the units (plt.axis = equal)
+
+        # fracture at 100 - 150 and depth of 70
+        # plot the V's and send to Jörn
+        # Can already store the V's to a file and don't have to calculate them
+
+        # Once V's stored => Have a flag to not have to store them!
+
+
 def main():
     solver = ForwardSolver()
-    solver.background_snapshots()
+    #solver.background_snapshots()
     solver.plot_intensity_I()
     
 if __name__ == "__main__":
