@@ -11,6 +11,10 @@ class FractureGenerator:
     def __init__(self,
                  image_width: int,
                  image_height: int,
+                 fractured_region_width: int,
+                 fractured_region_height: int,
+                 O_x: int,
+                 O_y: int,
                  n_fractures: int,
                  fracture_width,
                  buffer_size: int,
@@ -25,6 +29,10 @@ class FractureGenerator:
 
         self.image_height = image_height
         self.image_width = image_width
+        self.fractured_region_height = fractured_region_height
+        self.fractured_region_width = fractured_region_width
+        self.O_x = O_x
+        self.O_y = O_y
         self.n_fractures = n_fractures
         self.fracture_width = fracture_width
         self.buffer_size = buffer_size
@@ -33,8 +41,12 @@ class FractureGenerator:
 
         self.length_distribution = truncnorm(0, max_length, loc=max_length, scale=std_dev_length)
         self.angle_distribution = norm(loc=0, scale=std_dev_angle)
-        self.x_distribution = uniform(loc=0, scale=self.image_width)
-        self.y_distribution = uniform(loc=0, scale=self.image_height)
+
+        self.x_distribution = uniform(loc=self.O_x,
+                                      scale=self.O_x + self.fractured_region_width)
+        self.y_distribution = uniform(loc=self.O_y,
+                                      scale=self.O_y + self.fractured_region_height)
+
         self.low_velocity_modifier = truncnorm(0.3, 0.6, loc=0.45, scale=0.05)
         self.high_velocity_modifier = truncnorm(1.5, 3.0, loc=1.75, scale=0.5)
         self.modifier_distributions = [self.low_velocity_modifier, self.high_velocity_modifier]
@@ -130,8 +142,10 @@ class FractureGenerator:
         return convolved
 
     def _out_of_bounds(self, x, y):
-        return x < 0 or x >= self.image_width or \
-               y < 0 or y >= self.image_height
+        return x < self.O_x or \
+               x >= self.O_x + self.fractured_region_width or \
+               y < self.O_y or \
+               y >= self.O_y + self.fractured_region_height
 
     def _sample_coordinates(self, current_sample_iteration: int):
         if current_sample_iteration > self.max_iterations:
@@ -177,14 +191,14 @@ class FractureGenerator:
         rvs_vec = np.vectorize(self._noise_helper,
                         excluded=['distribution'],
                         otypes=['float32'])
-
         return rvs_vec(p=image, distribution=self.noise_distribution)
         """
 
     def _noise_helper(self, p, distribution):
         return p + distribution.rvs()
 
-    def plot_image(self, image):
+    def plot_image(self, image_path):
+        image = np.load(image_path)
         plt.gray()
         # plt.imshow(tf.squeeze(image))
         plt.imshow(np.squeeze(image))
@@ -201,11 +215,15 @@ def normalize_image(image: np.array):
 
 def main():
     # Specify parameters
-    image_height = 150
-    image_width = 300
-    n_fractures = 10
-    fracture_width = 4
-    buffer_size = 10 # space between fractures
+    image_height = 512
+    image_width = 512
+    fractured_region_height = 350
+    fractured_region_width = 175
+    O_x = 150
+    O_y = 81
+    n_fractures = 7
+    fracture_width = 2
+    buffer_size = 20 # space between fractures
     mean_noise = 1.0
     std_dev_noise = 0.2
     max_length = 50
@@ -214,11 +232,15 @@ def main():
     mean_noise = 1.0
     std_dev_noise = 0.2
     max_iterations = 15
-    n_images_to_generate = 1000
+    n_images_to_generate = 10
     background_velocity = 1000
 
     generator = FractureGenerator(image_width,
                                   image_height,
+                                  fractured_region_width,
+                                  fractured_region_height,
+                                  O_x,
+                                  O_y,
                                   n_fractures,
                                   fracture_width,
                                   buffer_size,
@@ -242,7 +264,7 @@ def main():
             result
         )
 
-    generator.plot_image(result)
+    generator.plot_image("./images/fractured/im0.npy")
 
 
 if __name__ == "__main__":
