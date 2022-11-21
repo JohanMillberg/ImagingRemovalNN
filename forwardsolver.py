@@ -107,7 +107,8 @@ class ForwardSolver:
 
         # New
         U_0 = np.zeros((self.N_x_im*self.N_y_im, self.N_s, self.N_t))
-        U_0[:,:,0] = u[1][self.O_x:self.O_x+self.N_x_im, self.O_y:self.O_y+self.N_y_im]
+        print(u[1][self.imaging_region_indices].shape) 
+        U_0[:,:,0] = u[1][self.imaging_region_indices]
         
 
         ### Continue to look here how many times the values are being stored in D-matrix and U_0-matrix
@@ -129,17 +130,12 @@ class ForwardSolver:
 
                 if i <= self.N_t*nts-1:
                     #U_0[:,:,index] = u[1]
-                    
                     # New
-                    U_0[:,:,index] = u[1][self.O_x:self.O_x+self.N_x_im, self.O_y:self.O_y+self.N_y_im]
-
-                    # Note to ourselves:
-                    # U_0 = np.reshape(U_0[U_0 in self.imaging_region_indices], (self.N_x_im * self.N_y_im, self.N_s * self.N_t))
-                    #U_0 = np.reshape(U_0[self.O_x:(self.N_x_im+self.O_x), self.O_y:(self.N_y_im+self.O_y)], (self.N_x_im * self.N_y_im, self.N_s * self.N_t))
+                    U_0[:,:,index] = u[1][self.imaging_region_indices]
 
                     count_storage_U_0 += 1
 
-        U_0 = np.reshape(U_0, (self.N_x * self.N_y, self.N_s * self.N_t))
+        U_0 = np.reshape(U_0, (self.N_x_im * self.N_y_im, self.N_s * self.N_t))
 
         print(f"Count D = {count_storage_D}")
         print(f"Count stage U_0 = {count_storage_U_0}")
@@ -172,10 +168,10 @@ class ForwardSolver:
         """
 
         # Import U_0
-        D, U_0_temp = self.forward_solver()
+        D, U_0 = self.forward_solver()
 
         # Only take the part of U_0 which is in the imaging region
-        U_0 = U_0_temp[self.imaging_region_indices]
+        # U_0 = U_0_temp[self.imaging_region_indices]
 
         # Since only background velocity as it is right now, we have R = R_0
         M, R = self.mass_matrix()
@@ -270,7 +266,7 @@ class ForwardSolver:
 
 def main():
     solver = ForwardSolver()
-    #solver.background_snapshots()
+    # solver.background_snapshots()
     solver.plot_intensity_I()
     
 if __name__ == "__main__":
