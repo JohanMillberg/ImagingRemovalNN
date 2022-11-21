@@ -160,8 +160,7 @@ class ForwardSolver:
         D, U_0_temp = self.forward_solver()
 
         # Only take the part of U_0 which is in the imaging region
-        ind = self.get_imaging_region_indices()
-        U_0 = U_0_temp[ind]
+        U_0 = U_0_temp[self.imaging_region_indices]
 
         # Since only background velocity as it is right now, we have R = R_0
         M, R = self.mass_matrix()
@@ -171,7 +170,7 @@ class ForwardSolver:
         
         I = self.imaging_func(V_0, R)
         print(np.shape(I))
-        np.savetxt("I_result.txt", I)
+        np.save("./I_result.npy", I)
 
         #### This step does not work... :( Look at later!
         self.plot_result_matrix(V_0, 'V_0', np.shape(V_0)[1], np.shape(V_0)[0])
@@ -198,7 +197,7 @@ class ForwardSolver:
         First, store as a matrix over the grid.
         Second, call the plot function to see how the results looks.
         """
-        I = np.loadtxt("I_result.txt", dtype=np.float64)
+        I = np.load("I_result.npy")
         data_temp = np.zeros((self.N_y_im, self.N_x_im), dtype=np.float64)
 
         for j in range(self.N_x_im):
@@ -233,7 +232,7 @@ class ForwardSolver:
 def main():
     solver = ForwardSolver()
     solver.background_snapshots()
-    #solver.plot_intensity_I()
+    solver.plot_intensity_I()
     
 if __name__ == "__main__":
     main()
