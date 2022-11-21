@@ -160,8 +160,7 @@ class ForwardSolver:
         D, U_0_temp = self.forward_solver()
 
         # Only take the part of U_0 which is in the imaging region
-        ind = self.get_imaging_region_indices()
-        U_0 = U_0_temp[ind]
+        U_0 = U_0_temp[self.imaging_region_indices]
 
         # Since only background velocity as it is right now, we have R = R_0
         M, R = self.mass_matrix()
@@ -232,8 +231,8 @@ class ForwardSolver:
 
 def main():
     solver = ForwardSolver()
-    solver.background_snapshots()
-    #solver.plot_intensity_I()
+    #solver.background_snapshots()
+    solver.plot_intensity_I()
     
 if __name__ == "__main__":
     main()
