@@ -1,0 +1,14 @@
+Starting test
+Run 'test.py'
+Program runs! :)
+
+Run numpy
+a = [0.         0.66666667 1.33333333 2.        ]
+
+Run tensorflow
+TensorFlow version: 2.8.0
+
+
+Program finished!
+ 
+TestFinished Finished
