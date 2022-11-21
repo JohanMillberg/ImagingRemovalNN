@@ -266,7 +266,7 @@ class ForwardSolver:
 
 def main():
     solver = ForwardSolver()
-    # solver.background_snapshots()
+    solver.background_snapshots()
     solver.plot_intensity_I()
     
 if __name__ == "__main__":
