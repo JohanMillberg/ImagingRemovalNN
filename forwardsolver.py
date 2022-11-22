@@ -177,13 +177,19 @@ class ForwardSolver:
         Find good way to use R and V_0! 
         Then only np.linalg.norm()**2 for each i in 1, .., N_x_im*N_y_im
         """
-        I = np.zeros((self.N_y_im * self.N_x_im), dtype = np.float64)
+        # I = np.zeros((self.N_y_im * self.N_x_im), dtype = np.float64)
         # print(f"Shape of input to norm: {np.shape(V_0[1, :] @ R)}")
 
-        for i in range(self.N_x_im*self.N_y_im):
-            I[i] = np.linalg.norm(V_0[i, :] @ R, 2)**2
+        # for i in range(self.N_x_im*self.N_y_im):
+        #     I[i] = np.linalg.norm(V_0[i, :] @ R, 2)**2
         # look at V_0 times R, square all entries and then sum them into the 2nd dimensions
+        
+        # Refraction of code after Jörn's comments above
+        I_temp = V_0 @ R
+        I_temp = np.square(I_temp)
 
+        I = I_temp.sum(axis=1)
+        
         return I
     
 ##### New by 2022-11-18 : try to plot to see if reasonable or not
@@ -244,8 +250,7 @@ class ForwardSolver:
 
 def main():
     solver = ForwardSolver()
-    #solver.background_snapshots()
-    #solver.calculate_imaging_alg()
+    solver.calculate_imaging_alg()
     solver.plot_intensity_I()
 
 if __name__ == "__main__":
