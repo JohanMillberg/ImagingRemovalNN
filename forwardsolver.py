@@ -3,6 +3,10 @@ import matplotlib.pyplot as plt
 from scipy import sparse
 from cholesky import mblockchol
 
+import matplotlib.colors as mcolors
+import scipy as sp
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 class ForwardSolver:
 
     def __init__(self, 
@@ -210,20 +214,22 @@ class ForwardSolver:
 
         Store the V's and send to Jörn!
         """
-        #plt.style.use('seaborn-white')
-        #plt.gray()
         fig, ax = plt.subplots()
-        im = ax.imshow(np.squeeze(matrix_results)) 
-        fig.colorbar(im, ax=ax)
+        im = ax.imshow(sp.ndimage.rotate(np.squeeze(matrix_results), -90), aspect = 'equal', cmap='Greys') 
         plt.title(f"Colormap of matrix {matrix_name}")
-        plt.xlabel("Coordinate in time")
-        plt.ylabel("Coordinate in space")
+        plt.xlabel("Coordinate in y-dim")
+        plt.ylabel("Coordinate in x-dim")
+        plt.xlim(0, y_dim)
+        plt.ylim(0, x_dim)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes('right', size='5%', pad=0.1)
+        fig.colorbar(im, cax=cax, orientation='vertical')
+        ax.invert_yaxis()
+
+        # Continue to look at getting axis equal!!!
+        
         plt.show()
-        # ax = plt.gca()
-        # ax.set_aspect('equal', adjustable='box')
-        # plt.axis('square')
-        # plt.axes()
-        # plt.axes((0, len(x_dim), 0, len(x_dim)))
+
 
         # From the plot, get the axis, and set equal
         # Try to transpose the image to get the width at the x-axis
@@ -239,7 +245,7 @@ class ForwardSolver:
 def main():
     solver = ForwardSolver()
     #solver.background_snapshots()
-    solver.calculate_imaging_alg()
+    #solver.calculate_imaging_alg()
     solver.plot_intensity_I()
 
 if __name__ == "__main__":
