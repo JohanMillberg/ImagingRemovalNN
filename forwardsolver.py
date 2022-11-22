@@ -2,8 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import sparse
 from cholesky import mblockchol
-
-import matplotlib.colors as mcolors
 import scipy as sp
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -15,7 +13,7 @@ class ForwardSolver:
                 N_s: int = 50,
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
-                N_t: int = 10,
+                N_t: int = 70,
                 background_velocity_value: float = 1000,
                 Bsrc_file: str = "Bsrc_T.txt",
                 N_x_im: int = 175,
@@ -174,21 +172,21 @@ class ForwardSolver:
     def calculate_imaging_func(self, V_0, R):
         """
         Imaging function at a point.
-        Find good way to use R and V_0! 
-        Then only np.linalg.norm()**2 for each i in 1, .., N_x_im*N_y_im
-        """
+        The code gives the same result as the following (but might be better computational wise):
+
         # I = np.zeros((self.N_y_im * self.N_x_im), dtype = np.float64)
         # print(f"Shape of input to norm: {np.shape(V_0[1, :] @ R)}")
 
         # for i in range(self.N_x_im*self.N_y_im):
         #     I[i] = np.linalg.norm(V_0[i, :] @ R, 2)**2
-        # look at V_0 times R, square all entries and then sum them into the 2nd dimensions
-        
+        # 
+        # Comment from Jörn on Zoom: look at V_0 times R, square all entries and then sum them into the 2nd dimensions
+        """
         # Refraction of code after Jörn's comments above
-        I_temp = V_0 @ R
-        I_temp = np.square(I_temp)
+        I = V_0 @ R
+        I = np.square(I)
 
-        I = I_temp.sum(axis=1)
+        I = I.sum(axis=1)
         
         return I
     
