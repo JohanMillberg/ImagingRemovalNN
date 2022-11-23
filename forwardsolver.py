@@ -4,6 +4,7 @@ from scipy import sparse
 from cholesky import mblockchol
 import scipy as sp
 from scipy import ndimage
+from os.path import exists
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 class ForwardSolver:
@@ -15,7 +16,7 @@ class ForwardSolver:
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
                 N_t: int = 70,
-                # background_velocity_value: float = 1000,
+                background_velocity_value: float = 1000,
                 Bsrc_file: str = "Bsrc_T.txt",
                 N_x_im: int = 175,
                 N_y_im: int = 350,
@@ -31,18 +32,25 @@ class ForwardSolver:
         self.N_y_im = N_y_im
         self.O_x = O_x
         self.O_y = O_y
+        self.Bsrc_file = Bsrc_file 
 
         self.imaging_region_indices = self.get_imaging_region_indices()
+
+        self.background_velocity_value = background_velocity_value
+        self.background_velocity = np.full(self.N**2,
+                                           background_velocity_value,
+                                           dtype=np.float64)
 
         self.tau = tau
         self.N_t = N_t
         self.delta_t = tau/20
-        # self.background_velocity_value = background_velocity_value
-
-        # self.background_velocity = np.full(self.N**2,
-        #                                    background_velocity_value,
-        #                                    dtype=np.float64)
-        self.Bsrc_file = Bsrc_file 
+        
+        if exists("./V0.npy"):
+            self.V_0 = np.load("./V0.npy")
+        
+        else:
+            self.V_0 = self.calculate_V0()
+            np.save("./V0.npy", self.V_0)
 
     def import_sources(self):
         
@@ -81,6 +89,14 @@ class ForwardSolver:
         D[0] = np.transpose(b) @ u[1]
 
         return u, A, D, b 
+
+    def calculate_V0(self):
+        u_init, A, D_init, b = self.init_simulation(self.background_velocity)
+        D, U_0 = self.calculate_u(u_init, A, D_init, b) 
+        R = self.calculate_mass_matrix(D)
+        V_0 = self.calculate_background_snapshots(U_0, R)
+
+        return V_0
 
     def find_indices(self,j):
         ind_t = np.linspace(0, self.N_s, self.N_s) + self.N_s*j 
@@ -139,9 +155,9 @@ class ForwardSolver:
         u_init, A_init, D_init, b = self.init_simulation(C)
         D, U_0 = self.calculate_u(u_init, A_init, D_init, b)
         R = self.calculate_mass_matrix(D)
-        V_0 = self.calculate_background_snapshots(U_0, R)
+        # V_0 = self.calculate_background_snapshots(U_0, R)
         # V_0 = U_0 @ np.linalg.inv(R) # or just have the "calculate_background_snapshots" here directly instead
-        I = self.calculate_imaging_func(V_0, R)
+        I = self.calculate_imaging_func(self.V_0, R)
 
         return I
 
@@ -263,6 +279,7 @@ def main():
                 delta_x = 0.0063,
                 tau = 3.0303*10**(-5),
                 N_t = 70,
+                background_velocity_value = 1000,
                 Bsrc_file = "Bsrc_T.txt",
                 N_x_im = 175,
                 N_y_im = 350,
