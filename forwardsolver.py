@@ -94,7 +94,7 @@ class ForwardSolver:
         u_init, A, D_init, b = self.init_simulation(self.background_velocity)
         D, U_0 = self.calculate_u(u_init, A, D_init, b) 
         R = self.calculate_mass_matrix(D)
-        V_0 = self.calculate_background_snapshots(U_0, R)
+        V_0 = U_0 @ np.linalg.inv(R)
 
         return V_0
 
@@ -142,22 +142,12 @@ class ForwardSolver:
 
 
     def calculate_intensity(self, C: np.array):
-        """
-        Help to make the code quicker and only to the self.forward_solver() function once
-        and store the variables instead of going over twice
-
-        1. Collect D & U_0 from self.forward_solver()
-        2. Calculate the mass matrix by self.calculate_mass_matrix(D)
-        3. Calculate the background snapshots by self.calculate_background_snapshots(U_0, R)
-        4. Calculate the imaging function I by self.calculate_imaging_func(V_0, R)
-        5. Save the values of I into a .npy-file
-        """
         u_init, A_init, D_init, b = self.init_simulation(C)
         D, U_0 = self.calculate_u(u_init, A_init, D_init, b)
         R = self.calculate_mass_matrix(D)
         # V_0 = self.calculate_background_snapshots(U_0, R)
         # V_0 = U_0 @ np.linalg.inv(R) # or just have the "calculate_background_snapshots" here directly instead
-        I = self.calculate_imaging_func(self.V_0, R)
+        I = self.calculate_imaging_func(R)
 
         return I
 
@@ -175,29 +165,12 @@ class ForwardSolver:
 
         return R
     
-    def calculate_background_snapshots(self, U_0, R):
+    def calculate_imaging_func(self, R):
         """
-        Function to calculate the orthogonalized background snapshots V_0
-        + size of V_0 = (N_x_im*N_y_im, N_s*N_t)
-        """
-        V_0 = U_0 @ np.linalg.inv(R)
-
-        return V_0
-
-    def calculate_imaging_func(self, V_0, R):
-        """
-        Imaging function at a point.
-        The code gives the same result as the following (but might be better computational wise):
-
-        # I = np.zeros((self.N_y_im * self.N_x_im), dtype = np.float64)
-        # print(f"Shape of input to norm: {np.shape(V_0[1, :] @ R)}")
-
         # for i in range(self.N_x_im*self.N_y_im):
         #     I[i] = np.linalg.norm(V_0[i, :] @ R, 2)**2
-        # 
-        # Comment from Jörn on Zoom: look at V_0 times R, square all entries and then sum them into the 2nd dimensions
         """
-        I = V_0 @ R
+        I = self.V_0 @ R
         I = np.square(I)
 
         I = I.sum(axis=1)
@@ -206,11 +179,6 @@ class ForwardSolver:
     
 ##### New by 2022-11-18 : try to plot to see if reasonable or not
     def plot_intensity(self, I):
-        """
-        Function to plot a colormap of the values stored in I.
-        First, store as a matrix over the grid by using np.reshape()
-        Second, call the plot function to see how the results looks.
-        """
         data_temp = np.reshape(I, (self.N_y_im, self.N_x_im))
 
         self.plot_result_matrix(data_temp, 'I', np.shape(data_temp)[1], np.shape(data_temp)[0])
@@ -232,15 +200,7 @@ class ForwardSolver:
                         matrix_name: str='matrix_results',
                         x_dim: int= 175,
                         y_dim: int= 150):
-        """
-        A function which plots the results in a matrix as a colormap!
 
-        Choose a gradient color map
-        Try to insert a variation in C (fraction) and see if you can see it! 
-        See if algorithm finds the fractions.
-
-        Store the V's and send to Jörn!
-        """
         fig, ax = plt.subplots()
         im = ax.imshow(ndimage.rotate(np.squeeze(matrix_results), -90), aspect = 'equal', cmap='Greys') 
         plt.title(f"Colormap of matrix {matrix_name}")
@@ -267,8 +227,6 @@ class ForwardSolver:
         # Can already store the V's to a file and don't have to calculate them
 
         # Once V's stored => Have a flag to not have to store them!
-
-
 
 
 def main():
