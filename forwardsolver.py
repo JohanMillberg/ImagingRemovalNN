@@ -13,7 +13,7 @@ class ForwardSolver:
                 N_s: int = 50,
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
-                N_t: int = 70,
+                N_t: int = 10,
                 background_velocity_value: float = 1000,
                 Bsrc_file: str = "Bsrc_T.txt",
                 N_x_im: int = 175,
@@ -81,7 +81,7 @@ class ForwardSolver:
 
         return u, A, D, b 
 
-    def index(self,j):
+    def index(self,j: int):
         ind_t = np.linspace(0, self.N_s, self.N_s) + self.N_s*j 
         ind_list = [int(x) for x in ind_t]
         return ind_list
@@ -145,7 +145,7 @@ class ForwardSolver:
         np.save("./I_result.npy", I)
 
 
-    def calculate_mass_matrix(self, D):
+    def calculate_mass_matrix(self, D: np.array):
         M = np.zeros((self.N_s*self.N_t, self.N_s*self.N_t), dtype=np.float64)
 
         for i in range(self.N_t):
@@ -159,7 +159,7 @@ class ForwardSolver:
 
         return R
     
-    def calculate_background_snapshots(self, U_0, R):
+    def calculate_background_snapshots(self, U_0: np.array, R: np.array):
         """
         Function to calculate the orthogonalized background snapshots V_0
         + size of V_0 = (N_x_im*N_y_im, N_s*N_t)
@@ -169,7 +169,7 @@ class ForwardSolver:
         return V_0
 
 
-    def calculate_imaging_func(self, V_0, R):
+    def calculate_imaging_func(self, V_0: np.array, R: np.array):
         """
         Imaging function at a point.
         The code gives the same result as the following (but might be better computational wise):
@@ -205,7 +205,7 @@ class ForwardSolver:
 
     
     def plot_result_matrix(self,
-                        matrix_results,
+                        matrix_results: np.array,
                         matrix_name: str='matrix_results',
                         x_dim: int= 175,
                         y_dim: int= 150):
