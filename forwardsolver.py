@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from scipy import sparse
 from cholesky import mblockchol
 import scipy as sp
+from scipy import ndimage
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 class ForwardSolver:
@@ -14,11 +15,11 @@ class ForwardSolver:
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
                 N_t: int = 70,
-                background_velocity_value: float = 1000,
+                # background_velocity_value: float = 1000,
                 Bsrc_file: str = "Bsrc_T.txt",
                 N_x_im: int = 175,
                 N_y_im: int = 350,
-                O_x: int = 25,
+                O_x: int = 150,
                 O_y: int = 81):
 
         self.N = N_x
@@ -36,11 +37,11 @@ class ForwardSolver:
         self.tau = tau
         self.N_t = N_t
         self.delta_t = tau/20
-        self.background_velocity_value = background_velocity_value
+        # self.background_velocity_value = background_velocity_value
 
-        self.background_velocity = np.full(self.N**2,
-                                           background_velocity_value,
-                                           dtype=np.float64)
+        # self.background_velocity = np.full(self.N**2,
+        #                                    background_velocity_value,
+        #                                    dtype=np.float64)
         self.Bsrc_file = Bsrc_file 
 
     def import_sources(self):
@@ -57,7 +58,7 @@ class ForwardSolver:
 
         return indices
         
-    def init_simulation(self):
+    def init_simulation(self, c: np.array):
         # Calculate operators
         I_k = sparse.identity(self.N)
         D_k = (1/self.delta_x**2)*sparse.diags([1,-2,1],[-1,0,1], shape=(self.N,self.N), dtype=np.float64)
@@ -65,7 +66,7 @@ class ForwardSolver:
         D_k[0, 0] = -1 * (1/self.delta_x**2)
 
         L = sparse.kron(D_k, I_k) + sparse.kron(I_k, D_k)
-        C = sparse.diags(self.background_velocity, 0, dtype=np.float64)
+        C = sparse.diags(c, 0, dtype=np.float64)
 
         A = (- C @ L @ C)
 
@@ -81,18 +82,16 @@ class ForwardSolver:
 
         return u, A, D, b 
 
-    def index(self,j):
+    def find_indices(self,j):
         ind_t = np.linspace(0, self.N_s, self.N_s) + self.N_s*j 
         ind_list = [int(x) for x in ind_t]
         return ind_list
 
-    def forward_solver(self):
+    def calculate_u(self, u, A, D, b):
         # Discretize time
         nts = 20
         T = (self.N_t * 2 - 1) * self.delta_t * nts
         time = np.linspace(0, T, num=2*self.N_t*nts)
-
-        u, A, D, b = self.init_simulation()
 
         U_0 = np.zeros((self.N_x_im*self.N_y_im, self.N_s, self.N_t))
         # print(u[1][self.imaging_region_indices].shape) 
@@ -126,7 +125,7 @@ class ForwardSolver:
         return D, U_0
 
 
-    def calculate_imaging_alg(self):
+    def calculate_intensity(self, C: np.array):
         """
         Help to make the code quicker and only to the self.forward_solver() function once
         and store the variables instead of going over twice
@@ -137,21 +136,22 @@ class ForwardSolver:
         4. Calculate the imaging function I by self.calculate_imaging_func(V_0, R)
         5. Save the values of I into a .npy-file
         """
-        D, U_0 = self.forward_solver()
+        u_init, A_init, D_init, b = self.init_simulation(C)
+        D, U_0 = self.calculate_u(u_init, A_init, D_init, b)
         R = self.calculate_mass_matrix(D)
         V_0 = self.calculate_background_snapshots(U_0, R)
         # V_0 = U_0 @ np.linalg.inv(R) # or just have the "calculate_background_snapshots" here directly instead
         I = self.calculate_imaging_func(V_0, R)
-        np.save("./I_result.npy", I)
 
+        return I
 
     def calculate_mass_matrix(self, D):
         M = np.zeros((self.N_s*self.N_t, self.N_s*self.N_t), dtype=np.float64)
 
         for i in range(self.N_t):
             for j in range(self.N_t):
-                ind_i = self.index(i)
-                ind_j = self.index(j)
+                ind_i = self.find_indices(i)
+                ind_j = self.find_indices(j)
 
                 M[ind_i[0]:ind_i[-1],ind_j[0]:ind_j[-1]] = 0.5 * (D[abs(i-j)] + D[abs(i+j)])
 
@@ -168,7 +168,6 @@ class ForwardSolver:
 
         return V_0
 
-
     def calculate_imaging_func(self, V_0, R):
         """
         Imaging function at a point.
@@ -182,7 +181,6 @@ class ForwardSolver:
         # 
         # Comment from Jörn on Zoom: look at V_0 times R, square all entries and then sum them into the 2nd dimensions
         """
-        # Refraction of code after Jörn's comments above
         I = V_0 @ R
         I = np.square(I)
 
@@ -191,19 +189,28 @@ class ForwardSolver:
         return I
     
 ##### New by 2022-11-18 : try to plot to see if reasonable or not
-    def plot_intensity_I(self):
+    def plot_intensity(self, I):
         """
         Function to plot a colormap of the values stored in I.
         First, store as a matrix over the grid by using np.reshape()
         Second, call the plot function to see how the results looks.
         """
-        I = np.load("I_result.npy")
         data_temp = np.reshape(I, (self.N_y_im, self.N_x_im))
 
         self.plot_result_matrix(data_temp, 'I', np.shape(data_temp)[1], np.shape(data_temp)[0])
 
+    def calculate_I_matrices(self, n_images: int, plot: bool, output_file: str = ""):
+        for i in range(n_images):
+            c = np.load(f"./images/fractured/im{i}.npy")
+            I = self.calculate_intensity(c)
 
-    
+            if plot:
+                self.plot_intensity(I)
+
+            if output_file:
+                np.save(output_file, I)
+
+
     def plot_result_matrix(self,
                         matrix_results,
                         matrix_name: str='matrix_results',
@@ -219,7 +226,7 @@ class ForwardSolver:
         Store the V's and send to Jörn!
         """
         fig, ax = plt.subplots()
-        im = ax.imshow(sp.ndimage.rotate(np.squeeze(matrix_results), -90), aspect = 'equal', cmap='Greys') 
+        im = ax.imshow(ndimage.rotate(np.squeeze(matrix_results), -90), aspect = 'equal', cmap='Greys') 
         plt.title(f"Colormap of matrix {matrix_name}")
         plt.xlabel("Coordinate in y-dim")
         plt.ylabel("Coordinate in x-dim")
@@ -246,10 +253,27 @@ class ForwardSolver:
         # Once V's stored => Have a flag to not have to store them!
 
 
+
+
 def main():
-    solver = ForwardSolver()
-    solver.calculate_imaging_alg()
-    solver.plot_intensity_I()
+    solver = ForwardSolver( 
+                N_x = 512,
+                N_y = 512,
+                N_s = 50,
+                delta_x = 0.0063,
+                tau = 3.0303*10**(-5),
+                N_t = 70,
+                Bsrc_file = "Bsrc_T.txt",
+                N_x_im = 175,
+                N_y_im = 350,
+                O_x = 150,
+                O_y = 81
+    )
+
+    solver.calculate_I_matrices(10, True, False)
+
+    # solver.calculate_intensities()
+    # solver.plot_intensity_I("./I_result.npy")
 
 if __name__ == "__main__":
     main()
