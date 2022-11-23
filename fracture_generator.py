@@ -114,6 +114,7 @@ class FractureGenerator:
         # fracture_image = self._add_noise(fracture_image, 1, 0.1)
         # fracture_image = tf.convert_to_tensor(fracture_image)
         # resulting_image = tf.math.add(image, fracture_image)
+        fracture_image = fracture_image.reshape(self.image_width*self.image_height)
 
 
         return fracture_image
@@ -199,6 +200,7 @@ class FractureGenerator:
 
     def plot_image(self, image_path):
         image = np.load(image_path)
+        image = image.reshape(self.image_height, self.image_width, 1)
         plt.gray()
         # plt.imshow(tf.squeeze(image))
         plt.imshow(np.squeeze(image))
@@ -255,8 +257,8 @@ def main():
     for i in range(n_images_to_generate):
         result = generator.generate_fractures()
     
-        result = normalize_image(result)
-        result = np.expand_dims(result, 2)
+        # result = normalize_image(result)
+        # result = np.expand_dims(result, 2)
 
         # Save the images
         np.save(
