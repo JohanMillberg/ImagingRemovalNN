@@ -92,7 +92,7 @@ class ForwardSolver:
 
     def calculate_V0(self):
         u_init, A, D_init, b = self.init_simulation(self.background_velocity)
-        D, U_0 = self.calculate_u(u_init, A, D_init, b) 
+        D, U_0 = self.calculate_u_d(u_init, A, D_init, b) 
         R = self.calculate_mass_matrix(D)
         V_0 = U_0 @ np.linalg.inv(R)
 
@@ -103,14 +103,14 @@ class ForwardSolver:
         ind_list = [int(x) for x in ind_t]
         return ind_list
 
-    def calculate_u(self, u, A, D, b):
+    def calculate_u_d(self, u, A, D, b):
+        # Make different function for D calculate_u_d
         # Discretize time
         nts = 20
         T = (self.N_t * 2 - 1) * self.delta_t * nts
         time = np.linspace(0, T, num=2*self.N_t*nts)
 
         U_0 = np.zeros((self.N_x_im*self.N_y_im, self.N_s, self.N_t))
-        # print(u[1][self.imaging_region_indices].shape) 
         U_0[:,:,0] = u[1][self.imaging_region_indices]
         
         count_storage_D = 0
@@ -133,6 +133,7 @@ class ForwardSolver:
 
                     count_storage_U_0 += 1
 
+
         U_0 = np.reshape(U_0, (self.N_x_im * self.N_y_im, self.N_s * self.N_t))
 
         print(f"Count D = {count_storage_D}")
@@ -140,13 +141,32 @@ class ForwardSolver:
 
         return D, U_0
 
+    def calculate_d(self, u, A, D, b):
+        nts = 20
+        T = (self.N_t * 2 - 1) * self.delta_t * nts
+        time = np.linspace(0, T, num=2*self.N_t*nts)
+        
+        count_storage_D = 0
+        count_storage_U_0 = 0
+        for i in range(1,len(time)):
+            u[2] = u[1] 
+            u[1] = u[0] 
+            u[0] = (-self.delta_t**2 * A) @ u[1] - u[2] + 2*u[1]
+
+            if (i % nts) == 0:
+                index = int(i/nts)
+                D[index] = np.transpose(b) @ u[1]
+                D[index] = 0.5*(D[index].T + D[index])
+
+                count_storage_D += 1
+
+        return D
+
 
     def calculate_intensity(self, C: np.array):
         u_init, A_init, D_init, b = self.init_simulation(C)
-        D, U_0 = self.calculate_u(u_init, A_init, D_init, b)
+        D = self.calculate_d(u_init, A_init, D_init, b)
         R = self.calculate_mass_matrix(D)
-        # V_0 = self.calculate_background_snapshots(U_0, R)
-        # V_0 = U_0 @ np.linalg.inv(R) # or just have the "calculate_background_snapshots" here directly instead
         I = self.calculate_imaging_func(R)
 
         return I
@@ -246,9 +266,8 @@ def main():
     )
 
     solver.calculate_I_matrices(10, True, False)
-
     # solver.calculate_intensities()
-    # solver.plot_intensity_I("./I_result.npy")
+    solver.plot_intensity_I("./I_result.npy")
 
 if __name__ == "__main__":
     main()
