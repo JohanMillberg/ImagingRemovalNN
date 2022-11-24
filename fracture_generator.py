@@ -220,7 +220,7 @@ def main():
     image_width = 512
     fractured_region_height = 350
     fractured_region_width = 175
-    O_x = 150
+    O_x = 25
     O_y = 81
     n_fractures = 5
     fracture_width = 4
@@ -233,7 +233,7 @@ def main():
     mean_noise = 1.0
     std_dev_noise = 0.2
     max_iterations = 15
-    n_images_to_generate = 0
+    n_images_to_generate = 10
     background_velocity = 1000
 
     generator = FractureGenerator(image_width,
