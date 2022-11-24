@@ -40,7 +40,7 @@ class FractureGenerator:
         self.background_velocity = background_velocity
 
         self.length_distribution = truncnorm(0, max_length, loc=max_length, scale=std_dev_length)
-        self.angle_distribution = norm(loc=0, scale=std_dev_angle)
+        self.angle_distribution = norm(loc=-90, scale=std_dev_angle)
 
         self.x_distribution = uniform(loc=self.O_x,
                                       scale=self.O_x + self.fractured_region_width)
