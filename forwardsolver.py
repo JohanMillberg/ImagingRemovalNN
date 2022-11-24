@@ -6,6 +6,7 @@ import scipy as sp
 from scipy import ndimage
 from os.path import exists
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from time import sleep
 
 class ForwardSolver:
 
@@ -20,7 +21,7 @@ class ForwardSolver:
                 Bsrc_file: str = "Bsrc_T.txt",
                 N_x_im: int = 175,
                 N_y_im: int = 350,
-                O_x: int = 150,
+                O_x: int = 25,
                 O_y: int = 81):
 
         self.N = N_x
@@ -92,9 +93,9 @@ class ForwardSolver:
 
     def calculate_V0(self):
         u_init, A, D_init, b = self.init_simulation(self.background_velocity)
-        D, U_0 = self.calculate_u(u_init, A, D_init, b) 
+        D, U_0 = self.calculate_u_d(u_init, A, D_init, b) 
         R = self.calculate_mass_matrix(D)
-        V_0 = self.calculate_background_snapshots(U_0, R)
+        V_0 = U_0 @ np.linalg.inv(R)
 
         return V_0
 
@@ -103,14 +104,14 @@ class ForwardSolver:
         ind_list = [int(x) for x in ind_t]
         return ind_list
 
-    def calculate_u(self, u, A, D, b):
+    def calculate_u_d(self, u, A, D, b):
+        # Make different function for D calculate_u_d
         # Discretize time
         nts = 20
         T = (self.N_t * 2 - 1) * self.delta_t * nts
         time = np.linspace(0, T, num=2*self.N_t*nts)
 
         U_0 = np.zeros((self.N_x_im*self.N_y_im, self.N_s, self.N_t))
-        # print(u[1][self.imaging_region_indices].shape) 
         U_0[:,:,0] = u[1][self.imaging_region_indices]
         
         count_storage_D = 0
@@ -133,31 +134,43 @@ class ForwardSolver:
 
                     count_storage_U_0 += 1
 
-        U_0 = np.reshape(U_0, (self.N_x_im * self.N_y_im, self.N_s * self.N_t))
+
+        #U_0 = np.reshape(U_0, (self.N_x_im * self.N_y_im, self.N_s * self.N_t))
+        U_0 = np.reshape(U_0, (self.N_x_im * self.N_y_im, self.N_s * self.N_t),order='F')
 
         print(f"Count D = {count_storage_D}")
         print(f"Count stage U_0 = {count_storage_U_0}")
 
         return D, U_0
 
+    def calculate_d(self, u, A, D, b):
+        nts = 20
+        T = (self.N_t * 2 - 1) * self.delta_t * nts
+        time = np.linspace(0, T, num=2*self.N_t*nts)
+        
+        count_storage_D = 0
+        for i in range(1,len(time)):
+            u[2] = u[1] 
+            u[1] = u[0] 
+            u[0] = (-self.delta_t**2 * A) @ u[1] - u[2] + 2*u[1]
+
+            if (i % nts) == 0:
+                index = int(i/nts)
+                D[index] = np.transpose(b) @ u[1]
+                D[index] = 0.5*(D[index].T + D[index])
+
+                count_storage_D += 1
+                print(count_storage_D)
+
+        print(f"Count D = {count_storage_D}")
+        return D
+
 
     def calculate_intensity(self, C: np.array):
-        """
-        Help to make the code quicker and only to the self.forward_solver() function once
-        and store the variables instead of going over twice
-
-        1. Collect D & U_0 from self.forward_solver()
-        2. Calculate the mass matrix by self.calculate_mass_matrix(D)
-        3. Calculate the background snapshots by self.calculate_background_snapshots(U_0, R)
-        4. Calculate the imaging function I by self.calculate_imaging_func(V_0, R)
-        5. Save the values of I into a .npy-file
-        """
         u_init, A_init, D_init, b = self.init_simulation(C)
-        D, U_0 = self.calculate_u(u_init, A_init, D_init, b)
+        D = self.calculate_d(u_init, A_init, D_init, b)
         R = self.calculate_mass_matrix(D)
-        # V_0 = self.calculate_background_snapshots(U_0, R)
-        # V_0 = U_0 @ np.linalg.inv(R) # or just have the "calculate_background_snapshots" here directly instead
-        I = self.calculate_imaging_func(self.V_0, R)
+        I = self.calculate_imaging_func(R)
 
         return I
 
@@ -175,29 +188,12 @@ class ForwardSolver:
 
         return R
     
-    def calculate_background_snapshots(self, U_0, R):
+    def calculate_imaging_func(self, R):
         """
-        Function to calculate the orthogonalized background snapshots V_0
-        + size of V_0 = (N_x_im*N_y_im, N_s*N_t)
-        """
-        V_0 = U_0 @ np.linalg.inv(R)
-
-        return V_0
-
-    def calculate_imaging_func(self, V_0, R):
-        """
-        Imaging function at a point.
-        The code gives the same result as the following (but might be better computational wise):
-
-        # I = np.zeros((self.N_y_im * self.N_x_im), dtype = np.float64)
-        # print(f"Shape of input to norm: {np.shape(V_0[1, :] @ R)}")
-
         # for i in range(self.N_x_im*self.N_y_im):
         #     I[i] = np.linalg.norm(V_0[i, :] @ R, 2)**2
-        # 
-        # Comment from Jörn on Zoom: look at V_0 times R, square all entries and then sum them into the 2nd dimensions
         """
-        I = V_0 @ R
+        I = self.V_0 @ R
         I = np.square(I)
 
         I = I.sum(axis=1)
@@ -205,15 +201,10 @@ class ForwardSolver:
         return I
     
 ##### New by 2022-11-18 : try to plot to see if reasonable or not
-    def plot_intensity(self, I):
-        """
-        Function to plot a colormap of the values stored in I.
-        First, store as a matrix over the grid by using np.reshape()
-        Second, call the plot function to see how the results looks.
-        """
+    def plot_intensity(self, I, plot_title):
         data_temp = np.reshape(I, (self.N_y_im, self.N_x_im))
 
-        self.plot_result_matrix(data_temp, 'I', np.shape(data_temp)[1], np.shape(data_temp)[0])
+        self.plot_result_matrix(data_temp, plot_title, np.shape(data_temp)[1], np.shape(data_temp)[0])
 
     def calculate_I_matrices(self, n_images: int, plot: bool, output_file: str = ""):
         for i in range(n_images):
@@ -221,7 +212,7 @@ class ForwardSolver:
             I = self.calculate_intensity(c)
 
             if plot:
-                self.plot_intensity(I)
+                self.plot_intensity(I, f'im{i}')
 
             if output_file:
                 np.save(output_file, I)
@@ -232,15 +223,7 @@ class ForwardSolver:
                         matrix_name: str='matrix_results',
                         x_dim: int= 175,
                         y_dim: int= 150):
-        """
-        A function which plots the results in a matrix as a colormap!
 
-        Choose a gradient color map
-        Try to insert a variation in C (fraction) and see if you can see it! 
-        See if algorithm finds the fractions.
-
-        Store the V's and send to Jörn!
-        """
         fig, ax = plt.subplots()
         im = ax.imshow(ndimage.rotate(np.squeeze(matrix_results), -90), aspect = 'equal', cmap='Greys') 
         plt.title(f"Colormap of matrix {matrix_name}")
@@ -267,6 +250,17 @@ class ForwardSolver:
         # Can already store the V's to a file and don't have to calculate them
 
         # Once V's stored => Have a flag to not have to store them!
+    
+    def plot_samples_of_V0(self):
+        V0 = np.load("V0.npy")
+        samples = [2500, 2547]
+        #for i in range(0, 3500, 50):
+        for i in samples:
+            fig, ax = plt.subplots()
+            im = ax.imshow(ndimage.rotate(np.reshape(V0[:, i], (self.N_y_im, self.N_x_im)), -90), aspect = 'equal', cmap='Greys') 
+            fig.colorbar(im)
+            plt.title(f"Colormap of V0[:, {i}]")
+        plt.show()
 
 
 
@@ -283,14 +277,48 @@ def main():
                 Bsrc_file = "Bsrc_T.txt",
                 N_x_im = 175,
                 N_y_im = 350,
-                O_x = 150,
+                O_x = 25,
                 O_y = 81
     )
 
     solver.calculate_I_matrices(10, True, False)
-
     # solver.calculate_intensities()
-    # solver.plot_intensity_I("./I_result.npy")
+    #I = np.load("./I_result.npy")
+    # V0 = np.load("./V0.npy")
+    #solver.plot_intensity(I)
+
+    solver.plot_samples_of_V0()
 
 if __name__ == "__main__":
     main()
+
+### Comments form Jörn on meeting before lunch 2022-11-24
+# store r_0 as well for pre-processing and being able to clean up after hand (small file)
+
+# plotting and reshaping is good since it looks like waves
+# jörn will check at weird amount of waves from a source and come back to us
+# looks weird with amount of waves from each source = should be 3
+
+# plotting u = perfect waves
+# very nice --> something wrong when calculating V_0
+
+
+# find out condition number of M
+# u's looks pretty and do exactly what we want them to do
+
+# move fractions closer to sources, change o_x and o_y
+
+# something wrong with V_0 maybe
+# check M, R etc
+
+# use @ in cholevsky instead of np.matmul
+
+# cholesky = A = LDL* (wikipedia)
+
+
+# test indices, 
+# use prime numbers in parameters for bug-testing (not divisable with anything)
+
+
+# Look at storage of U_0, plot them, see how they look!
+# Look at calculation of R
