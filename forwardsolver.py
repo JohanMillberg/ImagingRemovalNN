@@ -142,7 +142,6 @@ class ForwardSolver:
                     count_storage_U_0 += 1
 
 
-        #U_0 = np.reshape(U_0, (self.N_x_im * self.N_y_im, self.N_s * self.N_t))
         U_0 = np.reshape(U_0, (self.N_x_im * self.N_y_im, self.N_s * self.N_t),order='F')
 
         print(f"Count D = {count_storage_D}")
@@ -171,7 +170,6 @@ class ForwardSolver:
 
         print(f"Count D = {count_storage_D}")
         return D
-
 
     def calculate_intensity(self, C: np.array):
         u_init, A_init, D_init, b = self.init_simulation(C)
@@ -207,7 +205,6 @@ class ForwardSolver:
         
         return I
     
-##### New by 2022-11-18 : try to plot to see if reasonable or not
     def plot_intensity(self, I, plot_title):
         data_temp = np.reshape(I, (self.N_y_im, self.N_x_im))
 
@@ -249,22 +246,9 @@ class ForwardSolver:
         cax = divider.append_axes('right', size='5%', pad=0.1)
         fig.colorbar(im, cax=cax, orientation='vertical')
         ax.invert_yaxis()
-
-        # Continue to look at getting axis equal!!!
         
         plt.show()
 
-
-        # From the plot, get the axis, and set equal
-        # Try to transpose the image to get the width at the x-axis
-        # something that scales the axis according to the units (plt.axis = equal)
-
-        # fracture at 100 - 150 and depth of 70
-        # plot the V's and send to Jörn
-        # Can already store the V's to a file and don't have to calculate them
-
-        # Once V's stored => Have a flag to not have to store them!
-    
     def plot_samples_of_V0(self):
         V0 = np.load("V0.npy")
         samples = [2500, 2547]
@@ -275,8 +259,6 @@ class ForwardSolver:
             fig.colorbar(im)
             plt.title(f"Colormap of V0[:, {i}]")
         plt.show()
-
-
 
 
 def main():
@@ -305,34 +287,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-### Comments form Jörn on meeting before lunch 2022-11-24
-# store r_0 as well for pre-processing and being able to clean up after hand (small file)
-
-# plotting and reshaping is good since it looks like waves
-# jörn will check at weird amount of waves from a source and come back to us
-# looks weird with amount of waves from each source = should be 3
-
-# plotting u = perfect waves
-# very nice --> something wrong when calculating V_0
-
-
-# find out condition number of M
-# u's looks pretty and do exactly what we want them to do
-
-# move fractions closer to sources, change o_x and o_y
-
-# something wrong with V_0 maybe
-# check M, R etc
-
-# use @ in cholevsky instead of np.matmul
-
-# cholesky = A = LDL* (wikipedia)
-
-
-# test indices, 
-# use prime numbers in parameters for bug-testing (not divisable with anything)
-
-
-# Look at storage of U_0, plot them, see how they look!
-# Look at calculation of R

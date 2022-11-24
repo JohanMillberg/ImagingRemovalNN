@@ -40,7 +40,7 @@ class FractureGenerator:
         self.background_velocity = background_velocity
 
         self.length_distribution = truncnorm(0, max_length, loc=max_length, scale=std_dev_length)
-        self.angle_distribution = norm(loc=0, scale=std_dev_angle)
+        self.angle_distribution = norm(loc=-90, scale=std_dev_angle)
 
         self.x_distribution = uniform(loc=self.O_x,
                                       scale=self.O_x + self.fractured_region_width)
@@ -110,12 +110,11 @@ class FractureGenerator:
 
         # Produce the resulting image
         fracture_image[fracture_image == -1] = self.background_velocity # Remove the buffer
-        fracture_image = self._blur_fracture_edges(fracture_image)
+        # fracture_image = self._blur_fracture_edges(fracture_image)
         # fracture_image = self._add_noise(fracture_image, 1, 0.1)
         # fracture_image = tf.convert_to_tensor(fracture_image)
         # resulting_image = tf.math.add(image, fracture_image)
         fracture_image = fracture_image.reshape(self.image_width*self.image_height)
-
 
         return fracture_image
     
@@ -138,7 +137,7 @@ class FractureGenerator:
         psf = np.array([[1, 2, 1], [2, 3, 2], [1, 2,1 ]], dtype='float32')
         psf *= 1 / np.sum(psf)
 
-        convolved = conv2(convolved, psf, 'same')
+        convolved = conv2(convolved, psf, 'valid')
 
         return convolved
 
@@ -223,8 +222,8 @@ def main():
     fractured_region_width = 175
     O_x = 25
     O_y = 81
-    n_fractures = 7
-    fracture_width = 2
+    n_fractures = 5
+    fracture_width = 4
     buffer_size = 20 # space between fractures
     mean_noise = 1.0
     std_dev_noise = 0.2
@@ -259,7 +258,6 @@ def main():
     
         # result = normalize_image(result)
         # result = np.expand_dims(result, 2)
-
         # Save the images
         np.save(
             f"./images/fractured/im{i}.npy",
