@@ -221,7 +221,7 @@ def main():
     image_width = 512
     fractured_region_height = 350
     fractured_region_width = 175
-    O_x = 150
+    O_x = 25
     O_y = 81
     n_fractures = 7
     fracture_width = 2

@@ -6,7 +6,6 @@ import scipy as sp
 from scipy import ndimage
 from os.path import exists
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from time import sleep
 
 class ForwardSolver:
 
@@ -52,6 +51,11 @@ class ForwardSolver:
         else:
             self.V_0 = self.calculate_V0()
             np.save("./V0.npy", self.V_0)
+        
+        if not exists("./I_0.npy"):
+            R = np.load("./R_0.npy")
+            I_0 = self.calculate_imaging_func(R)
+            np.save("./I_0.npy", I_0)
 
     def import_sources(self):
         
@@ -96,6 +100,9 @@ class ForwardSolver:
         D, U_0 = self.calculate_u_d(u_init, A, D_init, b) 
         R = self.calculate_mass_matrix(D)
         V_0 = U_0 @ np.linalg.inv(R)
+
+        if not exists("./R_0.npy"):
+            np.save("./R_0.npy", R)
 
         return V_0
 
@@ -210,6 +217,13 @@ class ForwardSolver:
         for i in range(n_images):
             c = np.load(f"./images/fractured/im{i}.npy")
             I = self.calculate_intensity(c)
+            if exists("./I_0.npy"):
+                I_0 = np.load("./I_0.npy")
+            else:
+                R = np.load("./R_0.npy")
+                I_0 = self.calculate_imaging_func(R)
+            
+            I = I - I_0
 
             if plot:
                 self.plot_intensity(I, f'im{i}')
