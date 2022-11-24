@@ -13,7 +13,7 @@ class ForwardSolver:
                 N_s: int = 50,
                 delta_x: float = 0.0063,
                 tau: float = 3.0303*10**(-5),
-                N_t: int = 10,
+                N_t: int = 70,
                 background_velocity_value: float = 1000,
                 Bsrc_file: str = "Bsrc_T.txt",
                 N_x_im: int = 175,
@@ -144,6 +144,9 @@ class ForwardSolver:
         I = self.calculate_imaging_func(V_0, R)
         np.save("./I_result.npy", I)
 
+        # Save V_0 to a file and send to Jörn
+        # np.save("./V_0_result.npy", V_0)
+
 
     def calculate_mass_matrix(self, D: np.array):
         M = np.zeros((self.N_s*self.N_t, self.N_s*self.N_t), dtype=np.float64)
@@ -245,11 +248,36 @@ class ForwardSolver:
 
         # Once V's stored => Have a flag to not have to store them!
 
+    def plot_V_0(self):
+        """
+        Function to plot a colormap of V_0
+        """
+        V_0 = np.load("V_0_result.npy")
+        V_0 = np.reshape(V_0, (self.N_x_im*self.N_y_im, self.N_s*self.N_t))
+        print(np.shape(V_0))
+        print(V_0[50000,2500])
+
+        fig, ax = plt.subplots()
+        im = ax.imshow(V_0[:], cmap='Greys') 
+        plt.title(f"Colormap of matrix V_0")
+        plt.xlabel("Coordinate in y-dim")
+        plt.ylabel("Coordinate in x-dim")
+        # plt.xlim(0, np.shape(V_0)[0])
+        # plt.ylim(0, np.shape(V_0)[1])
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes('right', size='5%', pad=0.1)
+        fig.colorbar(im)
+        # ax.invert_yaxis()
+
+        # Continue to look at getting axis equal!!!
+        
+        plt.show()
 
 def main():
     solver = ForwardSolver()
-    solver.calculate_imaging_alg()
-    solver.plot_intensity_I()
+    #solver.calculate_imaging_alg()
+    #solver.plot_intensity_I()
+    solver.plot_V_0()
 
 if __name__ == "__main__":
     main()
