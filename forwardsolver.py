@@ -147,7 +147,6 @@ class ForwardSolver:
         time = np.linspace(0, T, num=2*self.N_t*nts)
         
         count_storage_D = 0
-        count_storage_U_0 = 0
         for i in range(1,len(time)):
             u[2] = u[1] 
             u[1] = u[0] 
@@ -160,6 +159,7 @@ class ForwardSolver:
 
                 count_storage_D += 1
 
+        print(f"Count D = {count_storage_D}")
         return D
 
 
