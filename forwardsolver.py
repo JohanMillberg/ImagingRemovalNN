@@ -273,11 +273,28 @@ class ForwardSolver:
         
         plt.show()
 
+    def plot_samples_of_V_0(self):
+        """
+        Function to only plots some samples of V_0 to present to Jörn
+        """
+        V_0 = np.load("V_0_result.npy")
+
+        samples = [3499, 2699, 2000, 749, 499, 74, 24]
+        for i in samples:
+            fig, ax = plt.subplots()
+            im = ax.imshow(sp.ndimage.rotate(np.reshape(V_0[:, i], (self.N_y_im,self.N_x_im)), -90), aspect = 'equal', cmap='Greys')
+            fig.colorbar(im)
+            plt.title(f"Colormap of V_0[:, {i}]")
+        plt.show()
+
+
+
 def main():
     solver = ForwardSolver()
     #solver.calculate_imaging_alg()
     #solver.plot_intensity_I()
-    solver.plot_V_0()
+    solver.plot_samples_of_V_0()
+    #solver.plot_V_0()
 
 if __name__ == "__main__":
     main()
