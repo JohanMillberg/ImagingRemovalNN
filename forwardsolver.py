@@ -45,12 +45,12 @@ class ForwardSolver:
         self.N_t = N_t
         self.delta_t = tau/20
         
-        if exists("./V0.npy"):
-            self.V_0 = np.load("./V0.npy")
+        if exists("./V_0.npy"):
+            self.V_0 = np.load("./V_0.npy")
         
         else:
             self.V_0 = self.calculate_V0()
-            np.save("./V0.npy", self.V_0)
+            np.save("./V_0.npy", self.V_0)
         
         if not exists("./I_0.npy"):
             R = np.load("./R_0.npy")
