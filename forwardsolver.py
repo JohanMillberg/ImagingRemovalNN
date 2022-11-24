@@ -6,6 +6,7 @@ import scipy as sp
 from scipy import ndimage
 from os.path import exists
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from time import sleep
 
 class ForwardSolver:
 
@@ -20,7 +21,7 @@ class ForwardSolver:
                 Bsrc_file: str = "Bsrc_T.txt",
                 N_x_im: int = 175,
                 N_y_im: int = 350,
-                O_x: int = 150,
+                O_x: int = 25,
                 O_y: int = 81):
 
         self.N = N_x
@@ -134,7 +135,7 @@ class ForwardSolver:
                     count_storage_U_0 += 1
 
 
-        U_0 = np.reshape(U_0, (self.N_x_im * self.N_y_im, self.N_s * self.N_t))
+        U_0 = np.reshape(U_0, (self.N_x_im * self.N_y_im, self.N_s * self.N_t),order='F')
 
         print(f"Count D = {count_storage_D}")
         print(f"Count stage U_0 = {count_storage_U_0}")
@@ -158,10 +159,10 @@ class ForwardSolver:
                 D[index] = 0.5*(D[index].T + D[index])
 
                 count_storage_D += 1
+                print(count_storage_D)
 
         print(f"Count D = {count_storage_D}")
         return D
-
 
     def calculate_intensity(self, C: np.array):
         u_init, A_init, D_init, b = self.init_simulation(C)
@@ -197,11 +198,10 @@ class ForwardSolver:
         
         return I
     
-##### New by 2022-11-18 : try to plot to see if reasonable or not
-    def plot_intensity(self, I):
+    def plot_intensity(self, I, plot_title):
         data_temp = np.reshape(I, (self.N_y_im, self.N_x_im))
 
-        self.plot_result_matrix(data_temp, 'I', np.shape(data_temp)[1], np.shape(data_temp)[0])
+        self.plot_result_matrix(data_temp, plot_title, np.shape(data_temp)[1], np.shape(data_temp)[0])
 
     def calculate_I_matrices(self, n_images: int, plot: bool, output_file: str = ""):
         for i in range(n_images):
@@ -209,7 +209,7 @@ class ForwardSolver:
             I = self.calculate_intensity(c)
 
             if plot:
-                self.plot_intensity(I)
+                self.plot_intensity(I, f'im{i}')
 
             if output_file:
                 np.save(output_file, I)
@@ -232,21 +232,19 @@ class ForwardSolver:
         cax = divider.append_axes('right', size='5%', pad=0.1)
         fig.colorbar(im, cax=cax, orientation='vertical')
         ax.invert_yaxis()
-
-        # Continue to look at getting axis equal!!!
         
         plt.show()
 
-
-        # From the plot, get the axis, and set equal
-        # Try to transpose the image to get the width at the x-axis
-        # something that scales the axis according to the units (plt.axis = equal)
-
-        # fracture at 100 - 150 and depth of 70
-        # plot the V's and send to Jörn
-        # Can already store the V's to a file and don't have to calculate them
-
-        # Once V's stored => Have a flag to not have to store them!
+    def plot_samples_of_V0(self):
+        V0 = np.load("V0.npy")
+        samples = [2500, 2547]
+        #for i in range(0, 3500, 50):
+        for i in samples:
+            fig, ax = plt.subplots()
+            im = ax.imshow(ndimage.rotate(np.reshape(V0[:, i], (self.N_y_im, self.N_x_im)), -90), aspect = 'equal', cmap='Greys') 
+            fig.colorbar(im)
+            plt.title(f"Colormap of V0[:, {i}]")
+        plt.show()
 
 
 def main():
@@ -261,13 +259,17 @@ def main():
                 Bsrc_file = "Bsrc_T.txt",
                 N_x_im = 175,
                 N_y_im = 350,
-                O_x = 150,
+                O_x = 25,
                 O_y = 81
     )
 
     solver.calculate_I_matrices(10, True, False)
     # solver.calculate_intensities()
-    solver.plot_intensity_I("./I_result.npy")
+    #I = np.load("./I_result.npy")
+    # V0 = np.load("./V0.npy")
+    #solver.plot_intensity(I)
+
+    solver.plot_samples_of_V0()
 
 if __name__ == "__main__":
     main()
