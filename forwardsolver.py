@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 from scipy import sparse
 from cholesky import mblockchol
 import scipy as sp
+import cupyx
+import cupy as cp
 from scipy import ndimage
 from os.path import exists
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -45,14 +47,14 @@ class ForwardSolver:
         self.N_t = N_t
         self.delta_t = tau/20
         
-        if exists("./V_0.npy"):
+        if exists("./V_0.np."):
             self.V_0 = np.load("./V_0.npy")
         
         else:
             self.V_0 = self.calculate_V0()
             np.save("./V_0.npy", self.V_0)
         
-        if not exists("./I_0.npy"):
+        if not exists("./I_0.np."):
             R = np.load("./R_0.npy")
             I_0 = self.calculate_imaging_func(R)
             np.save("./I_0.npy", I_0)
@@ -101,7 +103,7 @@ class ForwardSolver:
         R = self.calculate_mass_matrix(D)
         V_0 = U_0 @ np.linalg.inv(R)
 
-        if not exists("./R_0.npy"):
+        if not exists("./R_0.np."):
             np.save("./R_0.npy", R)
 
         return V_0
@@ -176,6 +178,7 @@ class ForwardSolver:
         D = self.calculate_d(u_init, A_init, D_init, b)
         R = self.calculate_mass_matrix(D)
         I = self.calculate_imaging_func(R)
+        I = self.get_image_derivative(I)
 
         return I
 
@@ -204,6 +207,14 @@ class ForwardSolver:
         I = I.sum(axis=1)
         
         return I
+
+    def get_image_derivative(self, I):
+        I = I.reshape((self.N_y_im, self.N_x_im))
+        dx = -1 * np.array([[-1, 0, 1]])
+        I_x = ndimage.convolve(I, dx)
+        I_x = I_x.reshape((-1, 1))
+
+        return I_x
     
     def plot_intensity(self, I, plot_title):
         data_temp = np.reshape(I, (self.N_y_im, self.N_x_im))
@@ -214,7 +225,7 @@ class ForwardSolver:
         for i in range(n_images):
             c = np.load(f"./images/fractured/im{i}.npy")
             I = self.calculate_intensity(c)
-            if exists("./I_0.npy"):
+            if exists("./I_0.np."):
                 I_0 = np.load("./I_0.npy")
             else:
                 R = np.load("./R_0.npy")
@@ -227,7 +238,6 @@ class ForwardSolver:
 
             if output_file:
                 np.save(output_file, I)
-
 
     def plot_result_matrix(self,
                         matrix_results,
