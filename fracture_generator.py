@@ -18,8 +18,9 @@ class FractureGenerator:
                  n_fractures: int,
                  fracture_width,
                  buffer_size: int,
-                 max_length: float = 160.0,
-                 std_dev_length: float = 30.0,
+                 max_length: float = 50.0,
+                 min_length: float = 20.0,
+                 std_dev_length: float = 10.0,
                  std_dev_angle: float = 30.0,
                  mean_noise: float = 1.0,
                  std_dev_noise: float = 0.2,
@@ -37,18 +38,31 @@ class FractureGenerator:
         self.fracture_width = fracture_width
         self.buffer_size = buffer_size
         self.max_length = max_length
+        self.min_length = min_length
         self.background_velocity = background_velocity
 
-        self.length_distribution = truncnorm(0, max_length, loc=max_length, scale=std_dev_length)
+        mean_length = (max_length + max_length) / 2
+        a_length = (min_length - mean_length) / std_dev_length
+        b_length = (max_length - mean_length) / std_dev_length
+
+        self.length_distribution = truncnorm(a=a_length, b=b_length, loc=mean_length, scale=std_dev_length)
+        #self.length_distribution = uniform(loc=min_length, scale=max_length)
         self.angle_distribution = norm(loc=-90, scale=std_dev_angle)
 
-        self.x_distribution = uniform(loc=self.O_x,
-                                      scale=self.O_x + self.fractured_region_width)
-        self.y_distribution = uniform(loc=self.O_y,
-                                      scale=self.O_y + self.fractured_region_height)
+        self.x_low = self.O_x
+        self.x_high = self.x_low + self.fractured_region_width
 
-        self.low_velocity_modifier = truncnorm(0.3, 0.6, loc=0.45, scale=0.05)
-        self.high_velocity_modifier = truncnorm(1.5, 3.0, loc=1.75, scale=0.5)
+
+        self.y_low = self.O_y
+        self.y_high = self.y_low + self.fractured_region_height
+
+        a_low = (0.3 - 0.45) / 0.05
+        b_low = (0.6 - 0.45) / 0.05 
+        self.low_velocity_modifier = truncnorm(a_low, b_low, loc=0.45, scale=0.05)
+
+        a_high = (1.5 - 2.25) / 0.25
+        b_high = (3.0 - 2.25) / 0.25
+        self.high_velocity_modifier = truncnorm(a_high, b_high, loc=2.25, scale=0.25)
         self.modifier_distributions = [self.low_velocity_modifier, self.high_velocity_modifier]
 
         self.mean_noise = mean_noise
@@ -59,8 +73,8 @@ class FractureGenerator:
     def generate_fractures(self):
         fracture_image = np.full((self.image_height, self.image_width), self.background_velocity)
         for _ in range(self.n_fractures):
-            fracture_is_valid = False
             n_iterations = 0
+            fracture_is_valid = False
             selected_modifier = np.random.choice(self.modifier_distributions)
             modifier_value = selected_modifier.rvs()
 
@@ -84,6 +98,7 @@ class FractureGenerator:
 
                 # Add the rest of the pixels to the fracture
                 fractured_pixels = 1
+                pixel_is_valid = True
                 while fractured_pixels < fracture_length:
                     x_exact = x_exact + np.cos(fracture_angle)
                     y_exact = y_exact + np.sin(fracture_angle)
@@ -93,14 +108,18 @@ class FractureGenerator:
 
                     if self._is_invalid_pixel(fracture_image, x_index, y_index):
                         n_iterations += 1
+                        pixel_is_valid = False
                         break
 
                     if (x_index, y_index) not in pixels_to_fracture:
                         pixels_to_fracture.append((x_index, y_index))
                         fractured_pixels += 1
 
-                # Create the fracture
+                if not pixel_is_valid:
+                    continue
+
                 fracture_is_valid = True
+                # Create the fracture
                 self._create_buffer(fracture_image, pixels_to_fracture)
                 for x, y in pixels_to_fracture:
                     self._fracture_pixel(fracture_image, x, y, modifier_value)
@@ -128,8 +147,7 @@ class FractureGenerator:
     def _fracture_pixel(self, image, x, y, modifier_value):
         for i in range(x-int(self.fracture_width/2), x+int(self.fracture_width/2)):
             for j in range(y-int(self.fracture_width/2), y+int(self.fracture_width/2)):
-                if not self._out_of_bounds(i, j) and not self._collides_with_fracture(image, i, j):
-                    image[j, i] = self.background_velocity*modifier_value
+                image[j, i] = self.background_velocity*modifier_value
     
     def _blur_fracture_edges(self, image):
         convolved = image.copy()
@@ -151,8 +169,8 @@ class FractureGenerator:
         if current_sample_iteration > self.max_iterations:
             raise RuntimeError("Unable to fit fracture in image")
 
-        xs = self.x_distribution.rvs().astype(int)
-        ys = self.y_distribution.rvs().astype(int)
+        xs = int(np.random.uniform(self.x_low, self.x_high))
+        ys = int(np.random.uniform(self.y_low, self.y_high))
         return xs, ys
 
     def _is_invalid_pixel(self, image, x, y):
@@ -220,14 +238,15 @@ def main():
     image_width = 512
     fractured_region_height = 350
     fractured_region_width = 175
-    O_x = 25
+    O_x = 100
     O_y = 81
-    n_fractures = 5
+    n_fractures = 4
     fracture_width = 4
-    buffer_size = 20 # space between fractures
+    buffer_size = 40 # space between fractures
     mean_noise = 1.0
     std_dev_noise = 0.2
     max_length = 50
+    min_length = 10
     std_dev_length = 10
     std_dev_angle = 30.0
     mean_noise = 1.0
@@ -246,6 +265,7 @@ def main():
                                   fracture_width,
                                   buffer_size,
                                   max_length,
+                                  min_length,
                                   std_dev_length,
                                   std_dev_angle,
                                   mean_noise,
