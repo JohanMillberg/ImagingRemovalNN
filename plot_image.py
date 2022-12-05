@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys, getopt
 
-filepath_label = f"labels/{sys.argv[1]}"
-filepath_data = f"data/{sys.argv[1]}"
+filepath_label = f"images/labels/{sys.argv[1]}"
+filepath_data = f"images/data/{sys.argv[1]}"
 
 label = np.load(filepath_label)
 data = np.load(filepath_data)

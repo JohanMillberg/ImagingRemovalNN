@@ -82,7 +82,7 @@ def artifact_remover_unet():
     f2, p2 = downsample_block(p1, 16, 5, 5)
     f3, p3 = downsample_block(p2, 32, 7, 7)
 
-    latent = dual_convolutional_block(p3, 32)
+    latent = dual_convolutional_block(p3, 5, 32)
 
     u6 = upsample_block(latent, f3, 32, 7, 7)
     u7 = upsample_block(u6, f2, 16, 5, 5)
@@ -117,17 +117,17 @@ def load_images(image_directory: str,
 
     for i in range(n_images):
         x_img_array = np.load(f"{image_directory}/data/im{i}.npy").reshape((350, 175))
-        x_img_array_list.append(preprocess_data(img_array))
+        x_img_array_list.append(preprocess_data(x_img_array))
 
         y_img_array = np.load(f"{image_directory}/labels/im{i}.npy")[im_indices]
         y_img_array = y_img_array.reshape((350, 175))
-        y_img_array_list.append(preprocess_data(img_array))
+        y_img_array_list.append(preprocess_data(y_img_array))
 
 
     x_image_tensor = np.stack(x_img_array_list, axis=0)
-    x_image_tensor = np.stack(y_img_array_list, axis=0)
+    y_image_tensor = np.stack(y_img_array_list, axis=0)
 
-    training_index = int(image_tensor.shape[0]*(1-validation_split))
+    training_index = int(x_image_tensor.shape[0]*(1-validation_split))
     x_train_images = x_image_tensor[:training_index, :, :]
     y_train_images = y_image_tensor[:training_index, :, :]
 
@@ -197,18 +197,11 @@ def plot_comparison(n_images, convolved_images, reconstructed_images):
         plt.imshow(tf.squeeze(reconstructed_images[i])) 
         cx.get_xaxis().set_visible(False) 
         cx.get_yaxis().set_visible(False) 
-        
-        # display original 
-        ax = plt.subplot(3, n, i + 2*n + 1) 
-        plt.title("original") 
-        plt.imshow(tf.squeeze(x_test[i])) 
-        ax.get_xaxis().set_visible(False) 
-        ax.get_yaxis().set_visible(False) 
 
     plt.show()
 
 if __name__ == "__main__":
-    x_train, y_train, x_test, y_test = load_images("/proj/i_rom/images", 1000, 0.2)
+    x_train, y_train, x_test, y_test = load_images("./images", 200, 0.2)
 
     """
     (x_train, _), (x_test, _) = fashion_mnist.load_data()
@@ -227,13 +220,13 @@ if __name__ == "__main__":
     metrics = ["accuracy"]
 
     artifact_remover.compile(metrics=metrics, loss=mse_sobel_loss, optimizer=optim)
-    artifact_remover.fit(x_train_convolved,
-            x_train,
+    artifact_remover.fit(x_train,
+            y_train,
             epochs=10,
             shuffle=False,
-            batch_size=16,
+            batch_size=10,
             verbose=2,
-            validation_data=(x_test_convolved, x_test))
+            validation_data=(x_test, y_test))
 
-    decoded_images = artifact_remover(x_test_convolved)
-    plot_comparison(3, x_test_convolved, decoded_images)
+    decoded_images = artifact_remover(x_test)
+    plot_comparison(3, x_test, decoded_images)
