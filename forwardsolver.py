@@ -232,6 +232,7 @@ class ForwardSolver:
                 I_0 = self.calculate_imaging_func(R)
             
             I = I - I_0
+            I = self.get_image_derivative(I)
 
             if plot:
                 self.plot_intensity(I, f'im{i}')

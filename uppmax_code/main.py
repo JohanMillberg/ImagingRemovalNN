@@ -42,6 +42,7 @@ def get_image_derivative(N_y_im, N_x_im, I):
 	
 def main(argv):
 	n_images_to_generate = int(argv[1])
+	start_index = int(argv[2])
 	print(f"Generating {n_images_to_generate} images.")
 
 	plot = False
@@ -52,7 +53,7 @@ def main(argv):
 	image_width = 512
 	fractured_region_height = 350
 	fractured_region_width = 175
-	O_x = 30
+	O_x = 25
 	O_y = 81
 	n_fractures = 4
 	fracture_width = 4
@@ -62,7 +63,7 @@ def main(argv):
 	max_length = 50
 	min_length = 20
 	std_dev_length = 10
-	std_dev_angle = 30.0
+	std_dev_angle = np.pi / 6
 	mean_noise = 1.0
 	std_dev_noise = 0.2
 	max_iterations = 15
@@ -111,10 +112,10 @@ def main(argv):
 	while generated_images < n_images_to_generate:
 		print(f"Image number {generated_images}") 
 		result = generator.generate_fractures()
-		np.save(f"/proj/i_rom/images/labels/im{generated_images}.npy", result)
+		np.save(f"/proj/i_rom/images/labels/im{generated_images+start_index}.npy", result)
 
 		try:
-			generate_I_matrix(solver, generated_images, fractured_region_width, fractured_region_height, N_t, N_s, plot, save)
+			generate_I_matrix(solver, generated_images+start_index, fractured_region_width, fractured_region_height, N_t, N_s, plot, save)
 			generated_images += 1
 		except np.linalg.LinAlgError:
 			print("Mass matrix was singular, recalculating...")	

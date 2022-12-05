@@ -47,7 +47,7 @@ class FractureGenerator:
 
         self.length_distribution = truncnorm(a=a_length, b=b_length, loc=mean_length, scale=std_dev_length)
         #self.length_distribution = uniform(loc=min_length, scale=max_length)
-        self.angle_distribution = norm(loc=-np.pi, scale=std_dev_angle)
+        self.angle_distribution = norm(loc=-np.pi/2, scale=std_dev_angle)
 
         self.x_low = self.O_x
         self.x_high = self.x_low + self.fractured_region_width
