@@ -21,7 +21,7 @@ class FractureGenerator:
                  max_length: float = 50.0,
                  min_length: float = 20.0,
                  std_dev_length: float = 10.0,
-                 std_dev_angle: float = np.pi / 6,
+                 std_dev_angle: float = np.pi / 6.0,
                  mean_noise: float = 1.0,
                  std_dev_noise: float = 0.2,
                  max_iterations: int = 15,
@@ -248,7 +248,7 @@ def main():
     max_length = 50
     min_length = 20
     std_dev_length = 10
-    std_dev_angle = np.pi / 6
+    std_dev_angle = np.pi / 6.0
     mean_noise = 1.0
     std_dev_noise = 0.2
     max_iterations = 15
@@ -276,16 +276,5 @@ def main():
     for i in range(n_images_to_generate):
         result = generator.generate_fractures()
     
-        # result = normalize_image(result)
-        # result = np.expand_dims(result, 2)
-        # Save the images
-        np.save(
-            f"./images/fractured/im{i}.npy",
-            result
-        )
-
-    generator.plot_image("./images/fractured/im0.npy")
-
-
 if __name__ == "__main__":
     main()

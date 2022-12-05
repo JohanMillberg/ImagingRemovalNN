@@ -20,5 +20,7 @@ label = (label - np.min(label)) / np.ptp(label)
 
 fig, ax = plt.subplots(1, 2)
 ax[0].imshow(label.squeeze(), cmap="gray")
+ax[0].set_title("Generated fracture image")
 ax[1].imshow(data.squeeze(), cmap="gray")
+ax[1].set_title("Result of the imaging algorithm")
 plt.show()
