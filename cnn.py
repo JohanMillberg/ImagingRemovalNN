@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from tensorflow.keras.datasets import fashion_mnist
 from scipy.signal import convolve2d as conv2
 from scipy.stats import truncnorm
+import sys, getopt
 from PIL import Image
 
 import os
@@ -53,12 +54,12 @@ class ArtifactRemoverV2(keras.Model):
         return self.model(x)
 
 
-
 def dual_convolutional_block(x, kernel_size, n_filters):
     x = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
     x = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
 
     return x
+
 
 def downsample_block(x, n_filters, kernel_size, downsample_stride):
     f = dual_convolutional_block(x, kernel_size, n_filters)
@@ -74,6 +75,7 @@ def upsample_block(x, conv_features, n_filters, kernel_size, upsample_stride):
     x = dual_convolutional_block(x, kernel_size, n_filters)
 
     return x
+
 
 def artifact_remover_unet():
     inputs = layers.Input(shape=(350, 175, 1))
@@ -94,6 +96,7 @@ def artifact_remover_unet():
 
     return model
 
+
 def mse_sobel_loss(target, predicted):
     sobel_target = tf.image.sobel_edges(target)
     sobel_predicted = tf.image.sobel_edges(predicted)
@@ -105,6 +108,7 @@ def mse_sobel_loss(target, predicted):
             tf.math.scalar_mul(gamma, K.mean(K.square(sobel_target - sobel_predicted))),
             tf.math.scalar_mul((1-gamma), mse(target, predicted))
     )
+
 
 def load_images(image_directory: str,
                 n_images: int,
@@ -136,6 +140,7 @@ def load_images(image_directory: str,
 
     return x_train_images, y_train_images, x_test_images, y_test_images
 
+
 def get_imaging_indices(O_x, O_y, image_width, N_x_im, N_y_im):
     im_y_indices = range(O_y, O_y+N_y_im)
     im_x_indices = range(O_x, O_x+N_x_im)
@@ -143,8 +148,10 @@ def get_imaging_indices(O_x, O_y, image_width, N_x_im, N_y_im):
 
     return indices
 
+
 def preprocess_data(image_array: np.array):
     return (image_array - np.min(image_array)) / np.ptp(image_array)
+
 
 def convolve_images(images):
     convolved = images.copy()
@@ -159,6 +166,7 @@ def convolve_images(images):
     convolved = convolved[..., tf.newaxis]
 
     return convolved
+
 
 def add_noise(images: np.array, mean_noise: float, std_dev_noise: float):
     
@@ -177,42 +185,32 @@ def add_noise(images: np.array, mean_noise: float, std_dev_noise: float):
 
     return noisy_images
 
-def plot_comparison(n_images, convolved_images, reconstructed_images):
- 
-    n = 3 
-    plt.figure(figsize=(20, 7))
+
+def plot_comparison(imaging_result, reconstructed_images, label_images):
+
+    fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3, 2)
     plt.gray()
 
-    for i in range(n): 
-        # display convoluted originals 
-        bx = plt.subplot(3, n, i + 1) 
-        plt.title("convoluted originals") 
-        plt.imshow(tf.squeeze(convolved_images[i])) 
-        bx.get_xaxis().set_visible(False) 
-        bx.get_yaxis().set_visible(False) 
-        
-        # display reconstruction 
-        cx = plt.subplot(3, n, i + n + 1) 
-        plt.title("reconstructed") 
-        plt.imshow(tf.squeeze(reconstructed_images[i])) 
-        cx.get_xaxis().set_visible(False) 
-        cx.get_yaxis().set_visible(False) 
+    plot_image(ax1, imaging_result[4], "Imaging algorithm result")
+    plot_image(ax2, imaging_result[5], "Imaging algorithm result")
+
+    plot_image(ax3, reconstructed_images[4], "Output of CNN")
+    plot_image(ax4, reconstructed_images[5], "Output of CNN")
+
+    plot_image(ax5, label_images[4], "Actual fracture image")
+    plot_image(ax6, label_images[5], "Actual fracture image")
 
     plt.show()
 
-if __name__ == "__main__":
-    x_train, y_train, x_test, y_test = load_images("./images", 200, 0.2)
 
-    """
-    (x_train, _), (x_test, _) = fashion_mnist.load_data()
-    x_train, x_test = preprocess_data(x_train, x_test)
-    """
+def plot_image(ax, image, title):
+    ax.imshow(tf.squeeze(image))
+    ax.set_title(title)
+    ax.get_xaxis().set_visible(False) 
+    ax.get_yaxis().set_visible(False) 
 
-    x_train = x_train[..., tf.newaxis]
-    y_train = y_train[..., tf.newaxis]
-    x_test = x_test[..., tf.newaxis]
-    y_test = y_test[..., tf.newaxis]
 
+def train_model(x_train, y_train, x_test, y_test):
     artifact_remover = artifact_remover_unet()
     # loss and optimizer
     loss = keras.losses.MeanSquaredError()
@@ -222,11 +220,30 @@ if __name__ == "__main__":
     artifact_remover.compile(metrics=metrics, loss=mse_sobel_loss, optimizer=optim)
     artifact_remover.fit(x_train,
             y_train,
-            epochs=10,
+            epochs=100,
             shuffle=False,
             batch_size=10,
-            verbose=2,
-            validation_data=(x_test, y_test))
+            verbose=2)
+            #validation_data=(x_test, y_test))
+
+    artifact_remover.save("./saved_model/trained_model.h5")
+    return artifact_remover
+
+if __name__ == "__main__":
+    x_train, y_train, x_test, y_test = load_images("./images", 1050, 0.02)
+    x_train = x_train[..., tf.newaxis]
+    y_train = y_train[..., tf.newaxis]
+    x_test = x_test[..., tf.newaxis]
+    y_test = y_test[..., tf.newaxis]
+    
+    if str(sys.argv[1]) == "load":
+        artifact_remover = tf.keras.models.load_model("./saved_model/trained_model.h5", compile=False)
+        optim = keras.optimizers.Adam(learning_rate=0.001)
+        metrics = ["accuracy"]
+        artifact_remover.compile(metrics=metrics, loss=mse_sobel_loss, optimizer=optim)
+
+    else:
+        artifact_remover = train_model(x_train, y_train, x_test, y_test)
 
     decoded_images = artifact_remover(x_test)
-    plot_comparison(3, x_test, decoded_images)
+    plot_comparison(x_test, decoded_images, y_test)
