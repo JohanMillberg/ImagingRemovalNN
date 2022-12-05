@@ -21,7 +21,7 @@ class FractureGenerator:
                  max_length: float = 50.0,
                  min_length: float = 20.0,
                  std_dev_length: float = 10.0,
-                 std_dev_angle: float = 30.0,
+                 std_dev_angle: float = np.pi / 6,
                  mean_noise: float = 1.0,
                  std_dev_noise: float = 0.2,
                  max_iterations: int = 15,
@@ -47,7 +47,7 @@ class FractureGenerator:
 
         self.length_distribution = truncnorm(a=a_length, b=b_length, loc=mean_length, scale=std_dev_length)
         #self.length_distribution = uniform(loc=min_length, scale=max_length)
-        self.angle_distribution = norm(loc=-np.pi, scale=std_dev_angle)
+        self.angle_distribution = norm(loc=-np.pi/2, scale=std_dev_angle)
 
         self.x_low = self.O_x
         self.x_high = self.x_low + self.fractured_region_width
@@ -248,7 +248,7 @@ def main():
     max_length = 50
     min_length = 20
     std_dev_length = 10
-    std_dev_angle = 30.0
+    std_dev_angle = np.pi / 6
     mean_noise = 1.0
     std_dev_noise = 0.2
     max_iterations = 15
