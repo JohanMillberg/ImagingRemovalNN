@@ -4,9 +4,9 @@ from keras import layers
 import keras.backend as K
 import numpy as np
 import matplotlib.pyplot as plt
-from tensorflow.keras.datasets import fashion_mnist
+from tensorflow_probability import stats
 from scipy.signal import convolve2d as conv2
-from scipy.stats import truncnorm
+from scipy.stats import wasserstein_distance;
 import sys, getopt
 from PIL import Image
 
@@ -54,25 +54,18 @@ class ArtifactRemoverV2(keras.Model):
         return self.model(x)
 
 
-def dual_convolutional_block(x, kernel_size, n_filters):
-    x = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
-    x = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
-
-    return x
-
-
-def downsample_block(x, n_filters, kernel_size, downsample_stride):
-    f = dual_convolutional_block(x, kernel_size, n_filters)
+def contracting_layers(x, n_filters, kernel_size, downsample_stride):
+    f = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
+    f = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(f)
     p = layers.MaxPool2D(downsample_stride)(f)
-    p = layers.Dropout(0.2)(p)
 
     return f, p
 
-def upsample_block(x, conv_features, n_filters, kernel_size, upsample_stride):
+def expanding_layers(x, copied_features, n_filters, kernel_size, upsample_stride):
     x = layers.Conv2DTranspose(n_filters, kernel_size, upsample_stride, padding='same')(x)
-    x = layers.concatenate([x, conv_features])
-    x = layers.Dropout(0.2)(x)
-    x = dual_convolutional_block(x, kernel_size, n_filters)
+    x = layers.concatenate([x, copied_features])
+    x = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
+    x = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
 
     return x
 
@@ -80,34 +73,38 @@ def upsample_block(x, conv_features, n_filters, kernel_size, upsample_stride):
 def artifact_remover_unet():
     inputs = layers.Input(shape=(350, 175, 1))
 
-    f1, p1 = downsample_block(inputs, 8, 5, 5) 
-    f2, p2 = downsample_block(p1, 16, 5, 5)
-    f3, p3 = downsample_block(p2, 32, 7, 7)
+    f1, p1 = contracting_layers(inputs, 16, 5, 5) 
+    f2, p2 = contracting_layers(p1, 32, 5, 5)
+    f3, p3 = contracting_layers(p2, 64, 7, 7)
 
-    latent = dual_convolutional_block(p3, 5, 32)
+    middle = layers.Conv2D(128, 5, padding='same', activation='relu')(p3)
 
-    u6 = upsample_block(latent, f3, 32, 7, 7)
-    u7 = upsample_block(u6, f2, 16, 5, 5)
-    u8 = upsample_block(u7, f1, 8, 5, 5)
+    u6 = expanding_layers(middle, f3, 64, 7, 7)
+    u7 = expanding_layers(u6, f2, 32, 5, 5)
+    u8 = expanding_layers(u7, f1, 16, 5, 5)
 
-    outputs = layers.Conv2D(1, 1, padding='same', activation='sigmoid')(u8)
+    outputs = layers.Conv2D(1, 1, padding='same')(u8)
     
     model = tf.keras.Model(inputs, outputs)
 
     return model
 
 
-def mse_sobel_loss(target, predicted):
+def calculate_emd(target, predicted):
+
+    ws_distances = []
+    for i in range(target.shape[0]):
+        t_hist, _ = np.histogram(target[i, :, :], bins=256, density = True)
+        p_hist, _ = np.histogram(predicted[i, :, :], bins=256, density = True)
+
+        ws_distances.append(wasserstein_distance(t_hist, p_hist))
+    return np.mean(ws_distances)
+
+def sobel_loss(target, predicted):
     sobel_target = tf.image.sobel_edges(target)
     sobel_predicted = tf.image.sobel_edges(predicted)
-    mse = tf.keras.losses.MeanSquaredError()
     
-    gamma = 1.0 # weight of sobel loss
-
-    return tf.math.add(
-            tf.math.scalar_mul(gamma, K.mean(K.square(sobel_target - sobel_predicted))),
-            tf.math.scalar_mul((1-gamma), mse(target, predicted))
-    )
+    return K.mean(K.square(sobel_target - sobel_predicted))
 
 
 def load_images(image_directory: str,
@@ -186,21 +183,21 @@ def add_noise(images: np.array, mean_noise: float, std_dev_noise: float):
     return noisy_images
 
 
-def plot_comparison(imaging_result, reconstructed_images, label_images):
+def plot_comparison(n_images, imaging_result, reconstructed_images, label_images):
 
-    fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3, 2)
-    plt.gray()
+    for i in range(n_images):
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+        plt.gray()
 
-    plot_image(ax1, imaging_result[4], "Imaging algorithm result")
-    plot_image(ax2, imaging_result[5], "Imaging algorithm result")
+        plot_image(ax1, imaging_result[i], "Imaging algorithm result")
 
-    plot_image(ax3, reconstructed_images[4], "Output of CNN")
-    plot_image(ax4, reconstructed_images[5], "Output of CNN")
+        plot_image(ax2, reconstructed_images[i], "Output of CNN")
 
-    plot_image(ax5, label_images[4], "Actual fracture image")
-    plot_image(ax6, label_images[5], "Actual fracture image")
+        plot_image(ax3, label_images[i], "Actual fracture image")
 
-    plt.show()
+        plt.savefig(f"images/pngs/im{i}")
+
+    print("Images saved.")
 
 
 def plot_image(ax, image, title):
@@ -210,17 +207,16 @@ def plot_image(ax, image, title):
     ax.get_yaxis().set_visible(False) 
 
 
-def train_model(x_train, y_train, x_test, y_test):
+def train_model(x_train, y_train):
     artifact_remover = artifact_remover_unet()
     # loss and optimizer
-    loss = keras.losses.MeanSquaredError()
     optim = keras.optimizers.Adam(learning_rate=0.001)
     metrics = ["accuracy"]
 
-    artifact_remover.compile(metrics=metrics, loss=mse_sobel_loss, optimizer=optim)
+    artifact_remover.compile(metrics=metrics, loss=sobel_loss, optimizer=optim)
     artifact_remover.fit(x_train,
             y_train,
-            epochs=100,
+            epochs=200,
             shuffle=False,
             batch_size=10,
             verbose=2)
@@ -230,7 +226,7 @@ def train_model(x_train, y_train, x_test, y_test):
     return artifact_remover
 
 if __name__ == "__main__":
-    x_train, y_train, x_test, y_test = load_images("./images", 1050, 0.02)
+    x_train, y_train, x_test, y_test = load_images("./images", 2050, 0.01)
     x_train = x_train[..., tf.newaxis]
     y_train = y_train[..., tf.newaxis]
     x_test = x_test[..., tf.newaxis]
@@ -240,10 +236,15 @@ if __name__ == "__main__":
         artifact_remover = tf.keras.models.load_model("./saved_model/trained_model.h5", compile=False)
         optim = keras.optimizers.Adam(learning_rate=0.001)
         metrics = ["accuracy"]
-        artifact_remover.compile(metrics=metrics, loss=mse_sobel_loss, optimizer=optim)
+        artifact_remover.compile(metrics=metrics, loss=sobel_loss, optimizer=optim)
 
     else:
-        artifact_remover = train_model(x_train, y_train, x_test, y_test)
+        artifact_remover = train_model(x_train, y_train)
 
-    decoded_images = artifact_remover(x_test)
-    plot_comparison(x_test, decoded_images, y_test)
+    artifact_remover.evaluate(x_test, y_test)
+
+    decoded_images = artifact_remover(x_test[:9])
+
+    # print(wasserstein_distance(y_test, decoded_images))
+
+    plot_comparison(8, x_test[:9], decoded_images[:9], y_test[:9])
