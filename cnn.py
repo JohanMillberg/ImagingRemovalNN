@@ -244,8 +244,10 @@ if __name__ == "__main__":
 
     artifact_remover.evaluate(x_test, y_test)
 
-    decoded_images = artifact_remover(x_test[:9])
+    images_to_decode = 10
 
-    print("Average earth mover distance: ", calculate_emd(y_test[:9,:,:,:], decoded_images))
+    decoded_images = artifact_remover(x_test[:11])
 
-    plot_comparison(8, x_test[:9], decoded_images[:9], y_test[:9])
+    print("Average earth mover distance: ", calculate_emd(y_test[:images_to_decode+1,:,:,:], decoded_images))
+
+    plot_comparison(images_to_decode, x_test[:images_to_decode+1], decoded_images[:images_to_decode+1], y_test[:images_to_decode+1])
