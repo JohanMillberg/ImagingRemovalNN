@@ -94,11 +94,12 @@ def calculate_emd(target, predicted):
 
     ws_distances = []
     for i in range(target.shape[0]):
-        t_hist, _ = np.histogram(target[i, :, :], bins=256, density = True)
-        p_hist, _ = np.histogram(predicted[i, :, :], bins=256, density = True)
+        t_hist, _ = np.histogram(target[i, :, :, :], bins=256, density = True)
+        p_hist, _ = np.histogram(predicted[i, :, :, :], bins=256, density = True)
 
         ws_distances.append(wasserstein_distance(t_hist, p_hist))
     return np.mean(ws_distances)
+
 
 def sobel_loss(target, predicted):
     sobel_target = tf.image.sobel_edges(target)
@@ -245,6 +246,6 @@ if __name__ == "__main__":
 
     decoded_images = artifact_remover(x_test[:9])
 
-    # print(wasserstein_distance(y_test, decoded_images))
+    print("Average earth mover distance: ", calculate_emd(y_test[:9,:,:,:], decoded_images))
 
     plot_comparison(8, x_test[:9], decoded_images[:9], y_test[:9])
