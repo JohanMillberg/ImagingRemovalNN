@@ -15,6 +15,36 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # tf.config.run_functions_eagerly(True)
 
+def residual_layer_block(inputs, n_filters, kernel_size, strides=1):
+    x = layers.Conv2D(n_filters, kernel_size, strides, padding='same')(inputs)
+    x = layers.BatchNormalization()(x)
+    y = layers.Activation('relu')(x)
+
+    y = layers.Conv2D(n_filters, kernel_size, strides, padding='same', activation='relu')(y) 
+    y = layers.Add()([x, y])
+
+    return y
+
+
+def residual_network():
+    inputs = layers.Input(shape=(344, 168, 1))
+
+    x = layers.Conv2D(16, 2, padding='same', strides=2)(inputs)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation('relu')(x)
+    x = layers.MaxPool2D(2, padding='same')(x)
+
+    for filters in (16, 32, 64, 128):
+        x = residual_layer_block(x, filters, 2)
+
+    x = layers.Conv2DTranspose(16, 2, 2, padding='same', activation='relu')(x)
+    x = layers.Conv2DTranspose(16, 2, 2, padding='same', activation='relu')(x)
+    outputs = layers.Conv2D(1, kernel_size=(1, 1), padding='same')(x)
+    model = tf.keras.Model(inputs, outputs)
+
+    return model
+
+
 def convolutional_autoencoder():
     inputs = layers.Input(shape=(344, 168, 1))
 
@@ -36,14 +66,17 @@ def convolutional_autoencoder():
 
 
 def contracting_layers(x, n_filters, kernel_size, downsample_stride):
-    f = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
+    f = layers.Conv2D(n_filters, kernel_size, padding='same')(x)
+    f = layers.BatchNormalization()(f)
+    f = layers.Activation('relu')(f)
+
     f = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(f)
     p = layers.MaxPool2D(downsample_stride)(f)
 
     return f, p
 
 def expanding_layers(x, copied_features, n_filters, kernel_size, upsample_stride):
-    x = layers.Conv2DTranspose(n_filters, kernel_size, upsample_stride, padding='same')(x)
+    x = layers.Conv2DTranspose(n_filters, kernel_size, upsample_stride, padding='same', activation='relu')(x)
     x = layers.concatenate([x, copied_features])
     x = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
     x = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
@@ -86,7 +119,12 @@ def sobel_loss(target, predicted):
     sobel_target = tf.image.sobel_edges(target)
     sobel_predicted = tf.image.sobel_edges(predicted)
     
-    return K.mean(K.square(sobel_target - sobel_predicted))
+    return tf.reduce_mean(tf.abs(sobel_target - sobel_predicted))
+
+
+def ssim_loss(target, predicted):
+    loss = 1 - tf.image.ssim(target, predicted, max_val=1.0)
+    return loss
 
 
 def get_images(file_name):
@@ -144,7 +182,7 @@ def get_imaging_indices(O_x, O_y, image_width, N_x_im, N_y_im):
 
 
 def preprocess_data(image_array: np.array):
-    return (image_array - np.min(image_array)) / np.ptp(image_array)
+    return (image_array - np.min(image_array)) / (np.max(image_array) - np.min(image_array))
 
 
 def plot_comparison(n_images, imaging_result, reconstructed_images, label_images):
@@ -173,12 +211,13 @@ def plot_image(ax, image, title):
 
 
 def train_model(x_train, y_train):
-    artifact_remover = artifact_remover_unet()
+    artifact_remover = residual_network()
     # artifact_remover = convolutional_autoencoder()
     # loss and optimizer
     optim = keras.optimizers.Adam(learning_rate=0.001)
+    loss = sobel_loss
 
-    artifact_remover.compile(loss=sobel_loss, optimizer=optim)
+    artifact_remover.compile(loss=loss, optimizer=optim)
     artifact_remover.fit(x_train,
             y_train,
             epochs=200,
@@ -196,8 +235,9 @@ if __name__ == "__main__":
     if str(sys.argv[1]) == "load":
         artifact_remover = tf.keras.models.load_model("./saved_model/trained_model.h5", compile=False)
         optim = keras.optimizers.Adam(learning_rate=0.001)
+        loss = sobel_loss
         metrics = ["accuracy"]
-        artifact_remover.compile(metrics=metrics, loss=sobel_loss, optimizer=optim)
+        artifact_remover.compile(metrics=metrics, loss=loss, optimizer=optim)
 
     else:
         artifact_remover = train_model(x_train, y_train)
