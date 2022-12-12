@@ -48,7 +48,7 @@ def residual_network():
 def convolutional_autoencoder():
     inputs = layers.Input(shape=(344, 168, 1))
 
-    p1 = layers.Conv2D(8, (2, 2), activation='relu', padding='same', strides=2)(inputs)
+    p1 = layers.Conv2D(8, (2, 2), activation='relu', padding='same', strides=1)(inputs)
     p2 = layers.Conv2D(16, (2, 2), activation='relu', padding='same', strides=2)(p1)
     p3 = layers.Conv2D(32, (2, 2), activation='relu', padding='same', strides=2)(p2)
 
@@ -87,7 +87,9 @@ def expanding_layers(x, copied_features, n_filters, kernel_size, upsample_stride
 def artifact_remover_unet():
     inputs = layers.Input(shape=(344, 168, 1))
 
-    f1, p1 = contracting_layers(inputs, 16, 2, 2) 
+    f1, p1 = contracting_layers(inputs, 16, 4, 4) 
+
+    # remove two contracting layers
     f2, p2 = contracting_layers(p1, 32, 2, 2)
     f3, p3 = contracting_layers(p2, 64, 2, 2)
 
@@ -109,6 +111,7 @@ def calculate_emd(target, predicted):
     ws_distances = []
     for i in range(target.shape[0]):
         t_hist, _ = np.histogram(target[i, :, :, :], bins=256, density = True)
+        print(t_hist)
         p_hist, _ = np.histogram(predicted[i, :, :, :], bins=256, density = True)
 
         ws_distances.append(wasserstein_distance(t_hist, p_hist))
@@ -139,7 +142,8 @@ def get_images(file_name):
 
 def load_images(image_directory: str,
                 n_images: int,
-                validation_split: float):
+                validation_split: float,
+                resize: bool):
 
     x_img_array_list = []
     y_img_array_list = []
@@ -165,10 +169,16 @@ def load_images(image_directory: str,
     x_test_images = x_image_tensor[training_index:, :, :]
     y_test_images = y_image_tensor[training_index:, :, :]
 
-    x_train_images = tf.image.resize(x_train_images[..., tf.newaxis], (344, 168))
-    y_train_images = tf.image.resize(y_train_images[..., tf.newaxis], (344, 168))
-    x_test_images = tf.image.resize(x_test_images[..., tf.newaxis], (344, 168))
-    y_test_images = tf.image.resize(y_test_images[..., tf.newaxis], (344, 168))
+    x_train_images = x_train_images[..., tf.newaxis]
+    y_train_images = y_train_images[..., tf.newaxis]
+    x_test_images = x_test_images[..., tf.newaxis]
+    y_test_images = y_test_images[..., tf.newaxis]
+
+    if resize:
+        x_train_images = tf.image.resize(x_train_images, (344, 168))
+        y_train_images = tf.image.resize(y_train_images, (344, 168))
+        x_test_images = tf.image.resize(x_test_images, (344, 168))
+        y_test_images = tf.image.resize(y_test_images, (344, 168))
 
     return x_train_images, y_train_images, x_test_images, y_test_images
 
@@ -230,7 +240,12 @@ def train_model(x_train, y_train):
     return artifact_remover
 
 if __name__ == "__main__":
-    x_train, y_train, x_test, y_test = load_images("./images", 2050, 0.01)
+
+    resize = False
+    if (sys.argv[2] == "True"):
+        resize = True
+
+    x_train, y_train, x_test, y_test = load_images("./images", 2050, 0.01, resize)
     
     if str(sys.argv[1]) == "load":
         artifact_remover = tf.keras.models.load_model("./saved_model/trained_model.h5", compile=False)
