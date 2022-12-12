@@ -27,18 +27,18 @@ def residual_layer_block(inputs, n_filters, kernel_size, strides=1):
 
 
 def residual_network():
-    inputs = layers.Input(shape=(344, 168, 1))
+    inputs = layers.Input(shape=(350, 175, 1))
 
-    x = layers.Conv2D(16, 2, padding='same', strides=2)(inputs)
+    x = layers.Conv2D(16, 5, padding='same', strides=5)(inputs)
     x = layers.BatchNormalization()(x)
     x = layers.Activation('relu')(x)
-    x = layers.MaxPool2D(2, padding='same')(x)
+    x = layers.MaxPool2D(5, padding='same')(x)
 
     for filters in (16, 32, 64, 128):
         x = residual_layer_block(x, filters, 2)
 
-    x = layers.Conv2DTranspose(16, 2, 2, padding='same', activation='relu')(x)
-    x = layers.Conv2DTranspose(16, 2, 2, padding='same', activation='relu')(x)
+    x = layers.Conv2DTranspose(16, 5, 5, padding='same', activation='relu')(x)
+    x = layers.Conv2DTranspose(16, 5, 5, padding='same', activation='relu')(x)
     outputs = layers.Conv2D(1, kernel_size=(1, 1), padding='same')(x)
     model = tf.keras.Model(inputs, outputs)
 
@@ -85,19 +85,19 @@ def expanding_layers(x, copied_features, n_filters, kernel_size, upsample_stride
 
 
 def artifact_remover_unet():
-    inputs = layers.Input(shape=(344, 168, 1))
+    inputs = layers.Input(shape=(350, 175, 1))
 
-    f1, p1 = contracting_layers(inputs, 16, 4, 4) 
+    f1, p1 = contracting_layers(inputs, 16, 5, 5) 
 
-    # remove two contracting layers
-    f2, p2 = contracting_layers(p1, 32, 2, 2)
-    f3, p3 = contracting_layers(p2, 64, 2, 2)
+    x = layers.Conv2D(32, 5, padding='same', activation='relu')(p1)
+    x = layers.Conv2D(64, 5, padding='same', activation='relu')(x)
 
-    middle = layers.Conv2D(128, 2, padding='same', activation='relu')(p3)
+    middle = layers.Conv2D(128, 3, padding='same', activation='relu')(x)
 
-    u6 = expanding_layers(middle, f3, 64, 2, 2)
-    u7 = expanding_layers(u6, f2, 32, 2, 2)
-    u8 = expanding_layers(u7, f1, 16, 2, 2)
+    x = layers.Conv2D(64, 5, padding='same', activation='relu')(middle)
+    x = layers.Conv2D(32, 5, padding='same', activation='relu')(x)
+
+    u8 = expanding_layers(x, f1, 16, 5, 5)
 
     outputs = layers.Conv2D(1, 1, padding='same')(u8)
     
@@ -122,11 +122,11 @@ def sobel_loss(target, predicted):
     sobel_target = tf.image.sobel_edges(target)
     sobel_predicted = tf.image.sobel_edges(predicted)
     
-    return tf.reduce_mean(tf.abs(sobel_target - sobel_predicted))
+    return tf.reduce_mean(tf.square((sobel_target - sobel_predicted)))
 
 
 def ssim_loss(target, predicted):
-    loss = 1 - tf.image.ssim(target, predicted, max_val=1.0)
+    loss = 1 - tf.reduce_mean(tf.image.ssim(target, predicted, max_val=1.0))
     return loss
 
 
@@ -220,9 +220,16 @@ def plot_image(ax, image, title):
     ax.get_yaxis().set_visible(False) 
 
 
-def train_model(x_train, y_train):
-    artifact_remover = residual_network()
-    # artifact_remover = convolutional_autoencoder()
+def train_model(x_train, y_train, model_name):
+    if model_name == "UNet":
+        artifact_remover = artifact_remover_unet()
+    elif model_name == "ResNet":
+        artifact_remover = residual_network()
+    elif model_name == "ConvAuto":
+        artifact_remover = convolutional_autoencoder()
+    else:
+        raise NotImplementedError()
+
     # loss and optimizer
     optim = keras.optimizers.Adam(learning_rate=0.001)
     loss = sobel_loss
@@ -236,26 +243,30 @@ def train_model(x_train, y_train):
             verbose=2)
             #validation_data=(x_test, y_test))
 
-    artifact_remover.save("./saved_model/trained_model.h5")
+    artifact_remover.save(f"./saved_model/{model_name}_trained_model.h5")
     return artifact_remover
 
 if __name__ == "__main__":
 
     resize = False
-    if (sys.argv[2] == "True"):
+    if (sys.argv[3] == "True"):
         resize = True
+
+    model_name = sys.argv[1]
 
     x_train, y_train, x_test, y_test = load_images("./images", 2050, 0.01, resize)
     
-    if str(sys.argv[1]) == "load":
-        artifact_remover = tf.keras.models.load_model("./saved_model/trained_model.h5", compile=False)
+    if str(sys.argv[2]) == "load":
+        artifact_remover = tf.keras.models.load_model(f"./saved_model/{model_name}_trained_model.h5", compile=False)
+
+        # set loss and optimizer here
         optim = keras.optimizers.Adam(learning_rate=0.001)
         loss = sobel_loss
         metrics = ["accuracy"]
         artifact_remover.compile(metrics=metrics, loss=loss, optimizer=optim)
 
     else:
-        artifact_remover = train_model(x_train, y_train)
+        artifact_remover = train_model(x_train, y_train, model_name)
 
     artifact_remover.evaluate(x_test, y_test)
 
