@@ -33,9 +33,9 @@ def residual_network():
     x = layers.BatchNormalization()(x)
 
     for filters in (16, 32, 64):
-        x = residual_layer_block(x, filters, 5)
+        x = residual_layer_block(x, filters, 3)
 
-    x = layers.Conv2DTranspose(16, 5, 5, padding='same', activation='relu')(x)
+    x = layers.Conv2DTranspose(128, 5, 5, padding='same', activation='relu')(x)
     outputs = layers.Conv2D(1, kernel_size=(1, 1), padding='same', activation='sigmoid')(x)
     model = tf.keras.Model(inputs, outputs)
 
@@ -83,13 +83,13 @@ def artifact_remover_unet():
 
     f1, p1 = contracting_layers(inputs, 16, 5, 5) 
 
-    x = layers.Conv2D(32, 5, padding='same', activation='relu')(p1)
-    x = layers.Conv2D(64, 5, padding='same', activation='relu')(x)
+    x = layers.Conv2D(32, 3, padding='same', activation='relu')(p1)
+    x = layers.Conv2D(64, 3, padding='same', activation='relu')(x)
 
-    middle = layers.Conv2D(128, 5, padding='same', activation='relu')(x)
+    middle = layers.Conv2D(128, 3, padding='same', activation='relu')(x)
 
-    x = layers.Conv2D(64, 5, padding='same', activation='relu')(middle)
-    x = layers.Conv2D(32, 5, padding='same', activation='relu')(x)
+    x = layers.Conv2D(64, 3, padding='same', activation='relu')(middle)
+    x = layers.Conv2D(32, 3, padding='same', activation='relu')(x)
 
     u8 = expanding_layers(x, f1, 16, 5, 5)
 
@@ -297,7 +297,7 @@ if __name__ == "__main__":
     model_name = sys.argv[1]
     loss_name = sys.argv[2]
 
-    x_train, y_train, x_test, y_test = load_images("./images", 2050, 0.01, resize)
+    x_train, y_train, x_test, y_test = load_images("./images", 2500, 0.05, resize)
     
     if str(sys.argv[3]) == "load":
         artifact_remover = tf.keras.models.load_model(f"./saved_model/{model_name}_{loss_name}_trained_model.h5", compile=False)
@@ -313,8 +313,6 @@ if __name__ == "__main__":
 
     artifact_remover.evaluate(x_test, y_test)
 
-    images_to_decode = 10
-
     one_frac_x, one_frac_y = get_images("one_frac.npy", resize)
     point_scatter_x, point_scatter_y = get_images("point_scatter.npy", resize)
     ten_frac_x, ten_frac_y = get_images("ten_frac.npy", resize)
@@ -323,13 +321,27 @@ if __name__ == "__main__":
     x_special = np.stack([one_frac_x, point_scatter_x, ten_frac_x, two_close_x], axis=0)
     y_special = np.stack([one_frac_y, point_scatter_y, ten_frac_y, two_close_y], axis=0)
 
-    decoded_images = artifact_remover(x_test[:21])
-    special_images = artifact_remover(x_special)
+    emds = []
+    mses = []
+    psnrs = []
+    ssims = []
 
-    print("Average earth mover distance: ", calculate_emd(y_test[:images_to_decode+1,:,:,:], decoded_images))
-    print("Average mean squared error: ", calculate_mse(y_test[:images_to_decode+1,:,:,:], decoded_images))
-    print("Average PSNR: ", calculate_psnr(y_test[:images_to_decode+1,:,:,:], decoded_images))
-    print("Average SSIM: ", calculate_ssim(y_test[:images_to_decode+1,:,:,:], decoded_images))
+    im_per_eval = 20
+
+    for i in range(6):
+        current_decoded_images = artifact_remover(x_test[i*im_per_eval:im_per_eval*i + im_per_eval+1])
+        emds.append(calculate_emd(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
+        mses.append(calculate_mse(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
+        psnrs.append(calculate_psnr(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
+        ssims.append(calculate_ssim(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
+
+    special_images = artifact_remover(x_special)
+    decoded_images = artifact_remover(x_test[:im_per_eval+1])
+
+    print("Average earth mover distance: ", np.mean(emds))
+    print("Average mean squared error: ", np.mean(mses))
+    print("Average PSNR: ", np.mean(psnrs))
+    print("Average SSIM: ", np.mean(ssims))
 
     plot_comparison(4, x_special, special_images, y_special, model_name, loss_name, 0)
-    plot_comparison(images_to_decode, x_test[:11], decoded_images, y_test[:11], model_name, loss_name, 4)
+    plot_comparison(im_per_eval, x_test[:im_per_eval+1], decoded_images, y_test[:im_per_eval+1], model_name, loss_name, 4)
