@@ -33,27 +33,45 @@ def residual_network():
     x = layers.BatchNormalization()(x)
 
     for filters in (16, 32, 64):
-        x = residual_layer_block(x, filters, 3)
+        x = residual_layer_block(x, filters, 5)
 
-    x = layers.Conv2DTranspose(128, 5, 5, padding='same', activation='relu')(x)
+    x = layers.Conv2DTranspose(16, 5, 5, padding='same', activation='relu')(x)
     outputs = layers.Conv2D(1, kernel_size=(1, 1), padding='same', activation='sigmoid')(x)
     model = tf.keras.Model(inputs, outputs)
 
     return model
 
+def convolutional_network():
+    inputs = layers.Input(shape=(350, 175, 1))
+
+    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(inputs)
+    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
+    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
+    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
+    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
+    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
+    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
+    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
+
+    outputs = layers.Conv2D(1, (1, 1), padding='same', activation='sigmoid')(x)
+
+    model = tf.keras.Model(inputs, outputs)
+    
+    return model
+
 
 def convolutional_autoencoder():
-    inputs = layers.Input(shape=(344, 168, 1))
+    inputs = layers.Input(shape=(350, 175, 1))
 
-    p1 = layers.Conv2D(16, (2, 2), activation='relu', padding='same', strides=2)(inputs)
-    p2 = layers.Conv2D(32, (2, 2), activation='relu', padding='same', strides=2)(p1)
+    x = layers.Conv2D(16, (5, 5), activation='relu', padding='same', strides=5)(inputs)
 
-    middle = layers.Conv2D(64, (2, 2), padding='same', activation='relu')(p2)
+    x = layers.Conv2D(32, (5, 5), padding='same', activation='relu')(x)
+    x = layers.Conv2D(64, (5, 5), padding='same', activation='relu')(x)
+    x = layers.Conv2D(32, (5, 5), padding='same', activation='relu')(x)
+    
+    x = layers.Conv2DTranspose(16, kernel_size=(5, 5), strides=5, activation='relu', padding='same')(x)
 
-    p3 = layers.Conv2DTranspose(32, kernel_size=(2, 2), strides=2, activation='relu', padding='same')(middle)
-    p4 = layers.Conv2DTranspose(16, kernel_size=(2, 2), strides=2, activation='relu', padding='same')(p3)
-
-    outputs = layers.Conv2D(1, kernel_size=(1, 1), padding='same', activation='sigmoid')(p4)
+    outputs = layers.Conv2D(1, kernel_size=(1, 1), padding='same', activation='sigmoid')(x)
 
     model = tf.keras.Model(inputs, outputs)
 
@@ -83,13 +101,13 @@ def artifact_remover_unet():
 
     f1, p1 = contracting_layers(inputs, 16, 5, 5) 
 
-    x = layers.Conv2D(32, 3, padding='same', activation='relu')(p1)
-    x = layers.Conv2D(64, 3, padding='same', activation='relu')(x)
+    x = layers.Conv2D(32, 5, padding='same', activation='relu')(p1)
+    x = layers.Conv2D(64, 5, padding='same', activation='relu')(x)
 
-    middle = layers.Conv2D(128, 3, padding='same', activation='relu')(x)
+    middle = layers.Conv2D(128, 5, padding='same', activation='relu')(x)
 
-    x = layers.Conv2D(64, 3, padding='same', activation='relu')(middle)
-    x = layers.Conv2D(32, 3, padding='same', activation='relu')(x)
+    x = layers.Conv2D(64, 5, padding='same', activation='relu')(middle)
+    x = layers.Conv2D(32, 5, padding='same', activation='relu')(x)
 
     u8 = expanding_layers(x, f1, 16, 5, 5)
 
@@ -118,14 +136,6 @@ def calculate_mse(target, predicted):
         mse_vals.append(mse(t, p))
     
     return np.mean(mse_vals)
-
-
-def calculate_psnr(target, predicted):
-    psnr_vals = []
-    for t, p in list(zip(target, predicted)):
-        psnr_vals.append(tf.image.psnr(t, p, max_val=1.0))
-
-    return np.mean(psnr_vals)
 
 
 def calculate_ssim(target, predicted):
@@ -242,7 +252,6 @@ def plot_comparison(n_images,
         plot_image(ax3, label_images[i], "Actual fracture image")
 
         plt.savefig(f"{save_path}/im{i+start_index}")
-        plt.show()
 
     print("Images saved.")
 
@@ -257,6 +266,8 @@ def plot_image(ax, image, title):
 def train_model(x_train, y_train, model_name, loss_name):
     if model_name == "UNet":
         artifact_remover = artifact_remover_unet()
+    elif model_name == "ConvNN":
+        artifact_remover = convolutional_network()
     elif model_name == "ResNet":
         artifact_remover = residual_network()
     elif model_name == "ConvAuto":
@@ -323,7 +334,6 @@ if __name__ == "__main__":
 
     emds = []
     mses = []
-    psnrs = []
     ssims = []
 
     im_per_eval = 20
@@ -332,7 +342,6 @@ if __name__ == "__main__":
         current_decoded_images = artifact_remover(x_test[i*im_per_eval:im_per_eval*i + im_per_eval+1])
         emds.append(calculate_emd(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
         mses.append(calculate_mse(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
-        psnrs.append(calculate_psnr(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
         ssims.append(calculate_ssim(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
 
     special_images = artifact_remover(x_special)
@@ -340,7 +349,6 @@ if __name__ == "__main__":
 
     print("Average earth mover distance: ", np.mean(emds))
     print("Average mean squared error: ", np.mean(mses))
-    print("Average PSNR: ", np.mean(psnrs))
     print("Average SSIM: ", np.mean(ssims))
 
     plot_comparison(4, x_special, special_images, y_special, model_name, loss_name, 0)
