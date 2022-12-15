@@ -16,12 +16,13 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 # tf.config.run_functions_eagerly(True)
 
 def residual_layer_block(inputs, n_filters, kernel_size, strides=1):
-    x = layers.Conv2D(n_filters, kernel_size, strides, padding='same', activation='relu')(inputs)
-    x = layers.BatchNormalization()(x)
-
-    y = layers.Conv2D(n_filters, kernel_size, strides, padding='same', activation='relu')(x) 
+    y = layers.Conv2D(n_filters, kernel_size, strides, padding='same', activation='relu')(inputs)
     y = layers.BatchNormalization()(y)
-    y = layers.Add()([x, y])
+
+    y = layers.Conv2D(n_filters, kernel_size, strides, padding='same', activation='relu')(y) 
+    y = layers.BatchNormalization()(y)
+    y = layers.Add()([inputs, y])
+    y = layers.Activation('relu')(y)
 
     return y
 
