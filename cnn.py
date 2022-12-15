@@ -19,7 +19,7 @@ def residual_layer_block(inputs, n_filters, kernel_size, strides=1):
     y = layers.Conv2D(n_filters, kernel_size, strides, padding='same', activation='relu')(inputs)
     y = layers.BatchNormalization()(y)
 
-    y = layers.Conv2D(n_filters, kernel_size, strides, padding='same', activation='relu')(y) 
+    y = layers.Conv2D(n_filters, kernel_size, strides, padding='same')(y) 
     y = layers.BatchNormalization()(y)
     y = layers.Add()([inputs, y])
     y = layers.Activation('relu')(y)
