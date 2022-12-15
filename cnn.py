@@ -291,9 +291,9 @@ def train_model(x_train, y_train, model_name, loss_name, stride):
     artifact_remover.compile(loss=loss, optimizer=optim)
     artifact_remover.fit(x_train,
             y_train,
-            epochs=200 if stride == 5 else 10,
+            epochs=200,
             shuffle=False,
-            batch_size=10 if stride == 5 else 5,
+            batch_size=10,
             verbose=2)
             #validation_data=(x_test, y_test))
 
