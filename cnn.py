@@ -37,7 +37,7 @@ def residual_network(stride):
         x = residual_layer_block(x, filters, 5)
 
     x = layers.UpSampling2D(stride)(x)
-    x = layers.Conv2D(16, 5, padding='same', strides=stride, activation='relu')(inputs)
+    x = layers.Conv2D(16, 5, padding='same', activation='relu')(inputs)
     outputs = layers.Conv2D(1, kernel_size=(1, 1), padding='same', activation='sigmoid')(x)
     model = tf.keras.Model(inputs, outputs)
 
