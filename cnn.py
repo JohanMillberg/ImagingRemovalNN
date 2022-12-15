@@ -31,14 +31,14 @@ def residual_network(stride):
     shape = (350, 175, 1) if stride == 5 else (344, 168, 1)
     inputs = layers.Input(shape=shape)
 
-    x = layers.Conv2D(16, 5, padding='same', strides=stride, activation='relu')(inputs)
+    x = layers.Conv2D(32, 5, padding='same', strides=stride, activation='relu')(inputs)
     x = layers.BatchNormalization()(x)
 
-    for filters in (16, 32, 64):
-        x = residual_layer_block(x, filters, 5)
+    for _ in range(3):
+        x = residual_layer_block(x, 32, 5)
 
     x = layers.UpSampling2D(stride)(x)
-    x = layers.Conv2D(16, 5, padding='same', activation='relu')(inputs)
+    x = layers.Conv2D(32, 5, padding='same', activation='relu')(x)
     outputs = layers.Conv2D(1, kernel_size=(1, 1), padding='same', activation='sigmoid')(x)
     model = tf.keras.Model(inputs, outputs)
 
