@@ -125,7 +125,7 @@ def expanding_layers(x, copied_features, n_filters, kernel_size, upsample_stride
     return x
 
 
-def adapted_unet_one(stride):
+def adapted_unet(stride):
     shape = (350, 175, 1) if stride == 5 else (344, 168, 1)
     inputs = layers.Input(shape=shape)
 
@@ -142,29 +142,6 @@ def adapted_unet_one(stride):
     u8 = expanding_layers(x, f1, 16, 5, stride)
 
     outputs = layers.Conv2D(1, 1, padding='same', activation='sigmoid')(u8)
-    
-    model = tf.keras.Model(inputs, outputs)
-
-    return model
-
-
-def adapted_unet_two(stride):
-    shape = (350, 175, 1) if stride == 5 else (344, 168, 1)
-    inputs = layers.Input(shape=shape)
-
-    f1, p1 = contracting_layers(inputs, 16, 5, stride) 
-    f2, p2 = contracting_layers(p1, 32, 3, stride) 
-
-    x = conv_with_batchnorm(p2, 64, 5)
-
-    middle = conv_with_batchnorm(x, 128, 5)
-
-    x = conv_with_batchnorm(middle, 64, 5)
-
-    u8 = expanding_layers(x, f2, 32, 3, stride)
-    u9 = expanding_layers(u8, f1, 16, 5, stride)
-
-    outputs = layers.Conv2D(1, 1, padding='same', activation='sigmoid')(u9)
     
     model = tf.keras.Model(inputs, outputs)
 
@@ -318,10 +295,8 @@ def plot_image(ax, image, title):
 
 
 def train_model(x_train, y_train, model_name, loss_name, stride):
-    if model_name == "UNetOne":
-        artifact_remover = adapted_unet_one(stride)
-    elif model_name == "UNetTwo":
-        artifact_remover = adapted_unet_two(stride)
+    if model_name == "UNet":
+        artifact_remover = adapted_unet(stride)
     elif model_name == "ConvNN":
         artifact_remover = convolutional_network()
     elif model_name == "ResNet":
