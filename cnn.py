@@ -15,13 +15,21 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # tf.config.run_functions_eagerly(True)
 
+
+def conv_with_batchnorm(inputs, n_filters, kernel_size):
+    x = layers.Conv2D(n_filters, kernel_size, padding='same')(inputs)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation('relu')(x)
+
+    return x
+
+
 def residual_layer_block(inputs, n_filters, kernel_size, strides=1):
-    y = layers.Conv2D(n_filters, kernel_size, strides, padding='same', activation='relu')(inputs)
-    y = layers.BatchNormalization()(y)
+    y = conv_with_batchnorm(inputs, n_filters, kernel_size)
 
     y = layers.Conv2D(n_filters, kernel_size, strides, padding='same')(y) 
-    y = layers.BatchNormalization()(y)
     y = layers.Add()([inputs, y])
+    y = layers.BatchNormalization()(y)
     y = layers.Activation('relu')(y)
 
     return y
@@ -31,14 +39,16 @@ def residual_network(stride):
     shape = (350, 175, 1) if stride == 5 else (344, 168, 1)
     inputs = layers.Input(shape=shape)
 
-    x = layers.Conv2D(32, 5, padding='same', strides=stride, activation='relu')(inputs)
+    x = layers.Conv2D(32, stride, strides=stride, padding='same')(inputs)
     x = layers.BatchNormalization()(x)
+    x = layers.Activation('stride')(x)
 
     for _ in range(3):
-        x = residual_layer_block(x, 32, 5)
+        x = residual_layer_block(x, 32, 5, 1)
 
     x = layers.UpSampling2D(stride)(x)
-    x = layers.Conv2D(32, 5, padding='same', activation='relu')(x)
+    x = conv_with_batchnorm(x, 32, stride)
+
     outputs = layers.Conv2D(1, kernel_size=(1, 1), padding='same', activation='sigmoid')(x)
     model = tf.keras.Model(inputs, outputs)
 
@@ -48,14 +58,14 @@ def residual_network(stride):
 def convolutional_network():
     inputs = layers.Input(shape=(350, 175, 1))
 
-    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(inputs)
-    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
-    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
-    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
-    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
-    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
-    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
-    x = layers.Conv2D(8, (5, 5), padding='same', activation='relu')(x)
+    x = conv_with_batchnorm(inputs, 8, 5)
+    x = conv_with_batchnorm(x, 16, 5)
+    x = conv_with_batchnorm(x, 16, 5)
+    x = conv_with_batchnorm(x, 16, 5)
+    x = conv_with_batchnorm(x, 16, 5)
+    x = conv_with_batchnorm(x, 16, 5)
+    x = conv_with_batchnorm(x, 16, 5)
+    x = conv_with_batchnorm(x, 8, 5)
 
     outputs = layers.Conv2D(1, (1, 1), padding='same', activation='sigmoid')(x)
 
@@ -68,14 +78,16 @@ def convolutional_autoencoder(stride):
     shape = (350, 175, 1) if stride == 5 else (344, 168, 1)
     inputs = layers.Input(shape=shape) 
 
-    x = layers.Conv2D(16, 5, stride, activation='relu', padding='same')(inputs)
+    x = layers.Conv2D(16, stride, stride, padding='same')(inputs)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation('relu')(x)
 
-    x = layers.Conv2D(32, 5, padding='same', activation='relu')(x)
-    x = layers.Conv2D(64, 5, padding='same', activation='relu')(x)
-    x = layers.Conv2D(32, 5, padding='same', activation='relu')(x)
+    x = conv_with_batchnorm(x, 32, 5)
+    x = conv_with_batchnorm(x, 64, 5)
+    x = conv_with_batchnorm(x, 32, 5)
     
     x = layers.UpSampling2D(stride)(x)
-    x = layers.Conv2D(16, 5, activation='relu', padding='same')(x)
+    x = conv_with_batchnorm(x, 16, stride)
 
     outputs = layers.Conv2D(1, kernel_size=(1, 1), padding='same', activation='sigmoid')(x)
 
@@ -84,43 +96,75 @@ def convolutional_autoencoder(stride):
     return model
 
 
-def contracting_layers(x, n_filters, kernel_size, downsample_stride):
-    f = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
-    f = layers.BatchNormalization()(f)
 
-    f = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(f)
-    p = layers.Conv2D(n_filters, kernel_size, strides=(downsample_stride, downsample_stride), padding='same', activation='relu')(f)
+
+def dual_conv_block(inputs, n_filters, kernel_size):
+    x = conv_with_batchnorm(inputs, n_filters, kernel_size)
+    x = conv_with_batchnorm(x, n_filters, kernel_size)
+
+    return x
+    
+
+def contracting_layers(x, n_filters, kernel_size, downsample_stride):
+    f = dual_conv_block(x, n_filters, kernel_size)
+    p = layers.Conv2D(n_filters, downsample_stride, strides=downsample_stride, padding='same')(f)
+    p = layers.BatchNormalization()(p)
+    p = layers.Activation('relu')(p)
 
     return f, p
 
 
 def expanding_layers(x, copied_features, n_filters, kernel_size, upsample_stride):
     x = layers.UpSampling2D(upsample_stride)(x)
-    x = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
+    x = conv_with_batchnorm(x, n_filters, upsample_stride)
+
     x = layers.concatenate([x, copied_features])
-    x = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
-    x = layers.Conv2D(n_filters, kernel_size, padding='same', activation='relu')(x)
+
+    x = dual_conv_block(x, n_filters, kernel_size)
 
     return x
 
 
-def artifact_remover_unet(stride):
+def adapted_unet_one(stride):
     shape = (350, 175, 1) if stride == 5 else (344, 168, 1)
     inputs = layers.Input(shape=shape)
 
     f1, p1 = contracting_layers(inputs, 16, 5, stride) 
 
-    x = layers.Conv2D(32, 5, padding='same', activation='relu')(p1)
-    x = layers.Conv2D(64, 5, padding='same', activation='relu')(x)
+    x = conv_with_batchnorm(p1, 32, 5)
+    x = conv_with_batchnorm(x, 64, 5)
 
-    middle = layers.Conv2D(128, 5, padding='same', activation='relu')(x)
+    middle = conv_with_batchnorm(x, 128, 5)
 
-    x = layers.Conv2D(64, 5, padding='same', activation='relu')(middle)
-    x = layers.Conv2D(32, 5, padding='same', activation='relu')(x)
+    x = conv_with_batchnorm(middle, 64, 5)
+    x = conv_with_batchnorm(x, 32, 5)
 
     u8 = expanding_layers(x, f1, 16, 5, stride)
 
     outputs = layers.Conv2D(1, 1, padding='same', activation='sigmoid')(u8)
+    
+    model = tf.keras.Model(inputs, outputs)
+
+    return model
+
+
+def adapted_unet_two(stride):
+    shape = (350, 175, 1) if stride == 5 else (344, 168, 1)
+    inputs = layers.Input(shape=shape)
+
+    f1, p1 = contracting_layers(inputs, 16, 5, stride) 
+    f2, p2 = contracting_layers(p1, 32, 3, stride) 
+
+    x = conv_with_batchnorm(p2, 64, 5)
+
+    middle = conv_with_batchnorm(x, 128, 5)
+
+    x = conv_with_batchnorm(middle, 64, 5)
+
+    u8 = expanding_layers(x, f2, 32, 3, stride)
+    u9 = expanding_layers(u8, f1, 16, 5, stride)
+
+    outputs = layers.Conv2D(1, 1, padding='same', activation='sigmoid')(u9)
     
     model = tf.keras.Model(inputs, outputs)
 
@@ -274,8 +318,10 @@ def plot_image(ax, image, title):
 
 
 def train_model(x_train, y_train, model_name, loss_name, stride):
-    if model_name == "UNet":
-        artifact_remover = artifact_remover_unet(stride)
+    if model_name == "UNetOne":
+        artifact_remover = adapted_unet_one(stride)
+    elif model_name == "UNetTwo":
+        artifact_remover = adapted_unet_two(stride)
     elif model_name == "ConvNN":
         artifact_remover = convolutional_network()
     elif model_name == "ResNet":
