@@ -41,7 +41,7 @@ def residual_network(stride):
 
     x = layers.Conv2D(32, stride, strides=stride, padding='same')(inputs)
     x = layers.BatchNormalization()(x)
-    x = layers.Activation('stride')(x)
+    x = layers.Activation('relu')(x)
 
     for _ in range(3):
         x = residual_layer_block(x, 32, 5, 1)
@@ -366,7 +366,7 @@ if __name__ == "__main__":
     model_name = sys.argv[1]
     loss_name = sys.argv[2]
 
-    x_train, y_train, x_test, y_test = load_images("./images", 2500, 0.05, resize)
+    x_train, y_train, x_test, y_test = load_images("./images", 2500, 0.2, resize)
     
     if str(sys.argv[4]) == "load":
         artifact_remover = tf.keras.models.load_model(f"./saved_model/{model_name}_{loss_name}_{stride}_trained_model.h5", compile=False)
