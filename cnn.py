@@ -44,7 +44,7 @@ def residual_network(stride):
     x = layers.Activation('relu')(x)
 
     for _ in range(3):
-        x = residual_layer_block(x, 32, 5, 1)
+        x = residual_layer_block(x, 32, 3, 1)
 
     x = layers.UpSampling2D(stride)(x)
     x = conv_with_batchnorm(x, 32, stride)
@@ -174,6 +174,19 @@ def calculate_ssim(target, predicted):
         ssim_vals.append(tf.reduce_mean(tf.image.ssim(tf.cast(t, tf.float64), tf.cast(p, tf.float64), max_val=1.0)))
 
     return np.mean(ssim_vals)
+
+
+def calculate_sobel_metric(target, predicted):
+    sobel_vals = []
+    for t, p in list(zip(target, predicted)):
+        sobel_target = tf.image.sobel_edges(t)
+        sobel_predicted = tf.image.sobel_edges(p)
+
+        sobel_loss = tf.reduce_mean(tf.square((sobel_target - sobel_predicted)))
+
+        sobel_vals.append(sobel_loss)
+    
+    return np.mean(sobel_vals)
     
 
 def sobel_loss(target, predicted):
@@ -284,6 +297,14 @@ def plot_comparison(n_images,
 
         plt.savefig(f"{save_path}/im{i+start_index}")
 
+        fig, ax = plt.figure()
+        plot_image(ax, reconstructed_images[i])
+        ax.set_title(f"Output of {model_name}")
+        ax.get_xaxis().set_visible(False) 
+        ax.get_yaxis().set_visible(False) 
+        plt.savefig(f"{save_path}/out{i+start_index}")
+
+
     print("Images saved.")
 
 
@@ -306,9 +327,12 @@ def train_model(x_train, y_train, model_name, loss_name, stride):
     else:
         raise NotImplementedError()
 
-    # loss and optimizer
+    # loss, early stopping and optimizer
     optim = keras.optimizers.Adam(learning_rate=0.001)
     loss = sobel_loss if loss_name == "sobel" else ssim_loss
+    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
+                                                      patience=5,
+                                                      restore_best_weights=True)
 
     artifact_remover.compile(loss=loss, optimizer=optim)
     artifact_remover.fit(x_train,
@@ -316,8 +340,9 @@ def train_model(x_train, y_train, model_name, loss_name, stride):
             epochs=200,
             shuffle=False,
             batch_size=10,
-            verbose=2)
-            #validation_data=(x_test, y_test))
+            verbose=2,
+            callbacks=[early_stopping],
+            validation_data=(x_test, y_test))
 
     artifact_remover.save(f"./saved_model/{model_name}_{loss_name}_{stride}_trained_model.h5")
     return artifact_remover
