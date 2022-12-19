@@ -179,12 +179,8 @@ def calculate_ssim(target, predicted):
 def calculate_sobel_metric(target, predicted):
     sobel_vals = []
     for t, p in list(zip(target, predicted)):
-        sobel_target = tf.image.sobel_edges(t)
-        sobel_predicted = tf.image.sobel_edges(p)
-
-        sobel_loss = tf.reduce_mean(tf.square((sobel_target - sobel_predicted)))
-
-        sobel_vals.append(sobel_loss)
+        loss = sobel_loss(t, p)
+        sobel_vals.append(loss)
     
     return np.mean(sobel_vals)
     
@@ -297,7 +293,7 @@ def plot_comparison(n_images,
 
         plt.savefig(f"{save_path}/im{i+start_index}")
 
-        fig, ax = plt.figure()
+        fig, ax = plt.subplots(1, 1)
         plot_image(ax, reconstructed_images[i])
         ax.set_title(f"Output of {model_name}")
         ax.get_xaxis().set_visible(False) 
@@ -331,7 +327,7 @@ def train_model(x_train, y_train, model_name, loss_name, stride):
     optim = keras.optimizers.Adam(learning_rate=0.001)
     loss = sobel_loss if loss_name == "sobel" else ssim_loss
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
-                                                      patience=5,
+                                                      patience=20,
                                                       restore_best_weights=True)
 
     artifact_remover.compile(loss=loss, optimizer=optim)
@@ -394,6 +390,7 @@ if __name__ == "__main__":
     emds = []
     mses = []
     ssims = []
+    sobel = []
 
     im_per_eval = 20
 
@@ -402,6 +399,7 @@ if __name__ == "__main__":
         emds.append(calculate_emd(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
         mses.append(calculate_mse(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
         ssims.append(calculate_ssim(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
+        sobel.append(calculate_sobel_metric(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
 
     special_images = artifact_remover(x_special)
     decoded_images = artifact_remover(x_test[:im_per_eval+1])
@@ -409,6 +407,7 @@ if __name__ == "__main__":
     print("Average earth mover distance: ", np.mean(emds))
     print("Average mean squared error: ", np.mean(mses))
     print("Average SSIM: ", np.mean(ssims))
+    print("Average sobel loss: ", np.mean(sobel))
 
     plot_comparison(4, x_special, special_images, y_special, model_name, loss_name, stride, 0)
     plot_comparison(im_per_eval, x_test[:im_per_eval+1], decoded_images, y_test[:im_per_eval+1], model_name, loss_name, stride, 4)
