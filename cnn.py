@@ -168,6 +168,9 @@ def calculate_mse(target, predicted):
 def calculate_ssim(target, predicted):
 
     return tf.reduce_mean(tf.image.ssim(tf.cast(target, tf.float64), tf.cast(predicted, tf.float64), max_val=1.0))
+
+def calculate_sobel(target, predicted):
+    return sobel_loss(tf.cast(target, tf.float64), tf.cast(predicted, tf.float64))
     
 
 def sobel_loss(target, predicted):
@@ -381,7 +384,7 @@ if __name__ == "__main__":
         emds.append(calculate_emd(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
         mses.append(calculate_mse(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
         ssims.append(calculate_ssim(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
-        sobel.append(sobel_loss(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
+        sobel.append(calculate_sobel(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
 
     special_images = artifact_remover(x_special)
     decoded_images = artifact_remover(x_test[:im_per_eval+1])
