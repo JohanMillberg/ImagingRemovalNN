@@ -33,12 +33,12 @@ if __name__=="__main__":
     images_used_to_evaluate = 500
     
     special_images = artifact_remover(x_special)
-    output = artifact_remover(x_test)
+    output = artifact_remover(x_test[:images_used_to_evaluate])
 
-    emd = calculate_emd(y_test, output)
-    mse = calculate_mse(y_test, output)
-    ssim = calculate_ssim(y_test, output)
-    sobel = calculate_sobel_metric(y_test, output)
+    emd = calculate_emd(y_test[:images_used_to_evaluate], output)
+    mse = calculate_mse(y_test[:images_used_to_evaluate], output)
+    ssim = calculate_ssim(y_test[:images_used_to_evaluate], output)
+    sobel = calculate_sobel_metric(y_test[:images_used_to_evaluate], output)
 
     print("Average earth mover distance: ", emd)
     print("Average mean squared error: ", mse)

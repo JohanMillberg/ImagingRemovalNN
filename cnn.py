@@ -179,6 +179,7 @@ def calculate_ssim(target, predicted):
 def calculate_sobel_metric(target, predicted):
     sobel_vals = []
     for t, p in list(zip(target, predicted)):
+        t, p = t[tf.newaxis, ...], p[tf.newaxis, ...]
         loss = sobel_loss(t, p)
         sobel_vals.append(loss)
     
@@ -294,10 +295,7 @@ def plot_comparison(n_images,
         plt.savefig(f"{save_path}/im{i+start_index}")
 
         fig, ax = plt.subplots(1, 1)
-        plot_image(ax, reconstructed_images[i])
-        ax.set_title(f"Output of {model_name}")
-        ax.get_xaxis().set_visible(False) 
-        ax.get_yaxis().set_visible(False) 
+        plot_image(ax, reconstructed_images[i], f"Output of {model_name}")
         plt.savefig(f"{save_path}/out{i+start_index}")
 
 
