@@ -178,7 +178,7 @@ def sobel_loss(target, predicted):
 
 
 def ssim_loss(target, predicted):
-    loss = 1 - tf.image.ssim(target, predicted, max_val=1.0)
+    loss = tf.reduce_mean(1 - tf.image.ssim(target, predicted, max_val=1.0))
     return loss
 
 
