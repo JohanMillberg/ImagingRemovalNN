@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from cnn import calculate_emd, calculate_mse, calculate_ssim, calculate_sobel_metric, load_images, sobel_loss, ssim_loss, get_images, plot_comparison
+from cnn import calculate_emd, calculate_mse, calculate_ssim, load_images, sobel_loss, ssim_loss, get_images, plot_comparison
 import sys, getopt
 
 
@@ -36,9 +36,9 @@ if __name__=="__main__":
     output = artifact_remover(x_test[:images_used_to_evaluate])
 
     emd = calculate_emd(y_test[:images_used_to_evaluate], output)
-    mse = calculate_mse(y_test[:images_used_to_evaluate], output)
-    ssim = calculate_ssim(y_test[:images_used_to_evaluate], output)
-    sobel = calculate_sobel_metric(y_test[:images_used_to_evaluate], output)
+    mse = calculate_mse(y_test[:images_used_to_evaluate], output).numpy()
+    ssim = calculate_ssim(y_test[:images_used_to_evaluate], output).numpy()
+    sobel = sobel_loss(tf.convert_to_tensor(y_test[:images_used_to_evaluate], tf.float32), tf.convert_to_tensor(output, tf.float32)).numpy()
 
     print("Average earth mover distance: ", emd)
     print("Average mean squared error: ", mse)

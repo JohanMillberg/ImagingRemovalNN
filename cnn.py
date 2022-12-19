@@ -160,41 +160,25 @@ def calculate_emd(target, predicted):
 
 
 def calculate_mse(target, predicted):
-    mse_vals = []
     mse = tf.keras.losses.MeanSquaredError()
-    for t, p in list(zip(target, predicted)):
-        mse_vals.append(mse(t, p))
     
-    return np.mean(mse_vals)
+    return mse(target, predicted)
 
 
 def calculate_ssim(target, predicted):
-    ssim_vals = []
-    for t, p in list(zip(target, predicted)):
-        ssim_vals.append(tf.reduce_mean(tf.image.ssim(tf.cast(t, tf.float64), tf.cast(p, tf.float64), max_val=1.0)))
 
-    return np.mean(ssim_vals)
-
-
-def calculate_sobel_metric(target, predicted):
-    sobel_vals = []
-    for t, p in list(zip(target, predicted)):
-        t, p = t[tf.newaxis, ...], p[tf.newaxis, ...]
-        loss = sobel_loss(t, p)
-        sobel_vals.append(loss)
-    
-    return np.mean(sobel_vals)
+    return tf.reduce_mean(tf.image.ssim(tf.cast(target, tf.float64), tf.cast(predicted, tf.float64), max_val=1.0))
     
 
 def sobel_loss(target, predicted):
     sobel_target = tf.image.sobel_edges(target)
     sobel_predicted = tf.image.sobel_edges(predicted)
     
-    return tf.reduce_mean(tf.square((sobel_target - sobel_predicted)))
+    return tf.reduce_mean(tf.square(tf.math.subtract(sobel_target, sobel_predicted)))
 
 
 def ssim_loss(target, predicted):
-    loss = 1 - tf.reduce_mean(tf.image.ssim(target, predicted, max_val=1.0))
+    loss = 1 - tf.image.ssim(target, predicted, max_val=1.0)
     return loss
 
 
@@ -325,7 +309,7 @@ def train_model(x_train, y_train, model_name, loss_name, stride):
     optim = keras.optimizers.Adam(learning_rate=0.001)
     loss = sobel_loss if loss_name == "sobel" else ssim_loss
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
-                                                      patience=20,
+                                                      patience=50,
                                                       restore_best_weights=True)
 
     artifact_remover.compile(loss=loss, optimizer=optim)
@@ -397,7 +381,7 @@ if __name__ == "__main__":
         emds.append(calculate_emd(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
         mses.append(calculate_mse(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
         ssims.append(calculate_ssim(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
-        sobel.append(calculate_sobel_metric(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
+        sobel.append(sobel_loss(y_test[i*im_per_eval:im_per_eval*i + im_per_eval+1], current_decoded_images))
 
     special_images = artifact_remover(x_special)
     decoded_images = artifact_remover(x_test[:im_per_eval+1])
